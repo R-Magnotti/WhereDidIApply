@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Job Tracker</title>
+</head>
+<body style="max-width: 600px; margin: 40px auto; font-family: sans-serif;">
+
+<h1>Job Tracker</h1>
+
+<label>Company<br>
+  <input id="company" type="text" style="width:100%">
+</label><br><br>
+
+<label>Job URL<br>
+  <input id="job_url" type="text" style="width:100%">
+</label><br><br>
+
+<label>Applied date<br>
+  <input id="applied_date" type="date">
+</label><br><br>
+
+<label>Status<br>
+  <select id="job_status">
+    <option>SAVED</option>
+    <option>PENDING</option>
+    <option>INTERVIEW</option>
+    <option>OFFER</option>
+    <option>REJECTED</option>
+  </select>
+</label><br><br>
+
+<label>Match %<br>
+  <input id="match_percentage" type="number" min="0" max="100">
+</label><br><br>
+
+<label>Notes<br>
+  <textarea id="notes" rows="3" style="width:100%"></textarea>
+</label><br><br>
+
+<button id="submit">Log Application</button>
+
+<h2>Applications</h2>
+<ul id="list"></ul>
+
+<script src="app.js"></script>
+</body>
+</html>
