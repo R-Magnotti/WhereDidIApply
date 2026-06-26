@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Job Tracker</title>
+<style>
+  /* the left panel: fixed width, scrolls when it gets tall */
+  #list-panel {
+    width: 280px;
+    height: 100vh;          /* full height of the browser window */
+    overflow-y: auto;       /* THIS is what makes it scroll vertically */
+    border-right: 1px solid #ccc;
+  }
+  /* each job tile */
+  .tile {
+    padding: 12px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;        /* makes it feel clickable */
+  }
+  .tile:hover {
+    background: #f5f5f5;     /* light highlight on mouse-over */
+  }
+  .tile .company {
+    font-weight: bold;
+  }
+  .tile .status {
+    font-size: 13px;
+    color: #666;
+  }
+</style>
+</head>
+<body style="margin:0; font-family: sans-serif;">
+
+  <div id="list-panel">
+    <div class="tile">
+        <div class="company" id="company"></div>
+        <div class="status" id="status"></div>
+  </div>
+
+<script src="app.js"></script>
+</body>
+</html>
