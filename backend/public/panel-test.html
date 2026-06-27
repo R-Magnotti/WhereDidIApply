@@ -4,21 +4,19 @@
 <meta charset="UTF-8" />
 <title>Job Tracker</title>
 <style>
-  /* the left panel: fixed width, scrolls when it gets tall */
   #list-panel {
     width: 280px;
-    height: 100vh;          /* full height of the browser window */
-    overflow-y: auto;       /* THIS is what makes it scroll vertically */
+    height: 100vh;
+    overflow-y: auto;
     border-right: 1px solid #ccc;
   }
-  /* each job tile */
   .tile {
     padding: 12px;
     border-bottom: 1px solid #eee;
-    cursor: pointer;        /* makes it feel clickable */
+    cursor: pointer;
   }
   .tile:hover {
-    background: #f5f5f5;     /* light highlight on mouse-over */
+    background: #f5f5f5;
   }
   .tile .company {
     font-weight: bold;
@@ -27,16 +25,40 @@
     font-size: 13px;
     color: #666;
   }
+
+  #detail-panel {
+    flex: 1;
+    padding: 20px;
+    height: 100vh;
+    overflow-y: auto;
+  }
 </style>
 </head>
 <body style="margin:0; font-family: sans-serif;">
 
-  <div id="list-panel">
-    <div class="tile">
-        <div class="company" id="company"></div>
-        <div class="status" id="status"></div>
+  <div style="display:flex; height:100vh;">
+
+    <div id="list-panel">
+      <!-- tiles get added here by JS -->
+    </div>
+
+    <div id="detail-panel">
+      <p id="detail-empty">Select a job to see details.</p>
+      <div id="detail-content" style="display:none;">
+        <h2 id="detail-company"></h2>
+        <p><strong>Status:</strong> <span id="detail-status"></span></p>
+        <p><strong>Applied:</strong> <span id="detail-applied"></span></p>
+        <p><strong>Interviewed:</strong> <span id="detail-interviewed"></span></p>
+        <p><strong>Reached out:</strong> <span id="detail-reached-out"></span></p>
+        <p><strong>Match %:</strong> <span id="detail-match"></span></p>
+        <p><strong>Link:</strong> <a id="detail-url" href="#" target="_blank"></a></p>
+        <p><strong>Notes:</strong></p>
+        <p id="detail-notes"></p>
+      </div>
+    </div>
+
   </div>
 
-<script src="app.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
