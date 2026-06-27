@@ -119,7 +119,3 @@ To do:
 - [ ] Python data-processing layer
 - [ ] Snowflake analytics warehouse added as an ELT destination in a second phase
 - [ ] Metabase dashboards over the warehouse for funnel and conversion analytics
-
-## License
-
-[MIT, or your choice]
