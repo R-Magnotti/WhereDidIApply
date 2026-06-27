@@ -1,4 +1,5 @@
-# Software Job Hunt Tracker
+# WhereDidIApply
+
 
 A PostgreSQL-backed web app for tracking software job applications: log each role, record its status and match, track outreach, and persist everything to a relational database.
 
