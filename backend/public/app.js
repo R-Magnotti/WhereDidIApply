@@ -1,5 +1,6 @@
-const detailEmpty = document.getElementById("detail-empty"); 
-const detailContent = document.getElementById("detail-content"); 
+const detailEmpty = document.getElementById("detail-empty");
+const detailContent = document.getElementById("detail-content");
+const detailCompany = document.getElementById("detail-company");
 const detailStatus = document.getElementById("detail-status");
 const detailApplied = document.getElementById("detail-applied");
 const detailInterviewed = document.getElementById("detail-interviewed");
@@ -9,14 +10,17 @@ const detailUrl = document.getElementById("detail-url");
 const detailNotes = document.getElementById("detail-notes");
 
 const editButton = document.getElementById("edit_button");
+const submitButton = document.getElementById("submit_button");
+const cancelButton = document.getElementById("cancel_button");
 
-const statusSelect = document.getElementById("status_dropdown");
-const appliedBox = document.getElementById("applied_textarea");
-const interviewedBox = document.getElementById("interviewed_textarea");
-const reachedOutBox = document.getElementById("reached_out_textarea");
-const matchBox = document.getElementById("match_textarea");
-const urlBox = document.getElementById("url_textarea");
-const notesBox = document.getElementById("notes_textarea");
+const editCompany = document.getElementById("company_textarea");
+const editStatus = document.getElementById("status_dropdown");
+const editApplied = document.getElementById("applied_date_select");
+const editInterviewed = document.getElementById("interviewed_date_select");
+const editReachedOut = document.getElementById("reached_out_date_select");
+const editMatch = document.getElementById("match_textarea");
+const editUrl = document.getElementById("url_textarea");
+const editNotes = document.getElementById("notes_textarea");
 
 const state = {
     currentJob: null,
@@ -25,43 +29,98 @@ const state = {
 
 function render() {
     if (state.isEditing) {
-        editButton.style.backgroundColor = "lightblue";
+        editButton.style.display = "none";
+        submitButton.style.display = "";
+        cancelButton.style.display = "";
 
+        // COMPANY
+        detailCompany.style.display = "none";
+        editCompany.style.display = "";
+        editCompany.value = state.currentJob.company;
+
+        // STATUS
         detailStatus.style.display = "none";    // stop display current value
-        statusSelect.style.display = "";           // start display editable element
-        statusSelect.value = state.currentJob.job_status;
+        editStatus.style.display = "";           // start display editable element
+        editStatus.value = state.currentJob.job_status;
 
+        // APPLIED DATE
+        detailApplied.style.display = "none";    
+        editApplied.style.display = "";           
+        editApplied.value = state.currentJob.applied_date?.slice(0, 10); // fixes ISO format
 
-        appliedBox.style.display = "";
-        interviewedBox.style.display = "";
-        reachedOutBox.style.display = "";
-        matchBox.style.display = "";
-        urlBox.style.display = "";
-        notesBox.style.display = "";
+        // INTERVIEWED DATE
+        detailInterviewed.style.display = "none";    
+        editInterviewed.style.display = "";          
+        editInterviewed.value = state.currentJob.interviewed_date?.slice(0, 10); 
 
-        // appliedBox.style.display = "";
-        // interviewedBox.style.display = "";
-        // reachedOutBox.style.display = "";
-        // matchBox.style.display = "";
-        // urlBox.style.display = "";
-        // notesBox.style.display = "";
+        // REACHED OUT TO RECRUITER DATE
+        detailReachedOut.style.display = "none";    
+        editReachedOut.style.display = "";          
+        editReachedOut.value = state.currentJob.reached_out_date?.slice(0, 10); 
+
+        // MATCH PERCENTAGE
+        detailMatch.style.display = "none";
+        editMatch.style.display = "";
+        editMatch.value = state.currentJob.match_percentage;
+
+        // JOB URL
+        detailUrl.style.display = "none";
+        editUrl.style.display = "";
+        editUrl.value = state.currentJob.job_url;
+
+        // NOTES
+        detailNotes.style.display = "none";
+        editNotes.style.display = "";
+        editNotes.value = state.currentJob.notes;
     } else {
-        editButton.style.backgroundColor = "";   // reset to default
+        /////// TOGGLE DISPLAY ITEMS ///////
+        editButton.style.display = "";   // reset to default
+        submitButton.style.display = "none";
+        cancelButton.style.display = "none";
 
-        detailStatus.style.display = "";    // stop display current value
-        statusSelect.style.display = "none";           // start display editable element
-        // state.currentJob.job_status = statusSelect.value;
+        // COMPANY
+        detailCompany.style.display = "";
+        editCompany.style.display = "none";
 
+        // STATUS
+        detailStatus.style.display = "";
+        editStatus.style.display = "none";
 
-        statusSelect.style.display = "none";
-        appliedBox.style.display = "none";
-        interviewedBox.style.display = "none";
-        reachedOutBox.style.display = "none";
-        matchBox.style.display = "none";
-        urlBox.style.display = "none";
-        notesBox.style.display = "none";
+        // APPLIED DATE
+        detailApplied.style.display = "";
+        editApplied.style.display = "none";
 
-        submit()
+        // INTERVIEWED DATE
+        detailInterviewed.style.display = "";
+        editInterviewed.style.display = "none";
+
+        // REACHED OUT TO RECRUITER DATE
+        detailReachedOut.style.display = "";
+        editReachedOut.style.display = "none";
+
+        // MATCH PERCENTAGE
+        detailMatch.style.display = "";
+        editMatch.style.display = "none";
+
+        // JOB URL
+        detailUrl.style.display = "";
+        editUrl.style.display = "none";
+
+        // NOTES
+        detailNotes.style.display = "";
+        editNotes.style.display = "none";
+
+        /////// PAINT DISPLAY VALUES FROM STATE ///////
+        if (state.currentJob) {
+            detailCompany.textContent      = state.currentJob.company;
+            detailStatus.textContent       = state.currentJob.job_status;
+            detailApplied.textContent      = state.currentJob.applied_date;
+            detailInterviewed.textContent  = state.currentJob.interviewed_date;
+            detailReachedOut.textContent   = state.currentJob.reached_out_date;
+            detailMatch.textContent        = state.currentJob.match_percentage;
+            detailUrl.textContent          = state.currentJob.job_url;
+            detailNotes.textContent        = state.currentJob.notes;
+        }
     }
 } 
 
@@ -82,6 +141,36 @@ async function submit() {
       body: JSON.stringify({body: data}),
     });
     load();
+  }
+
+async function update_table() {
+    const data = {
+        job_id:           state.currentJob.id,
+        company:          editCompany.value,
+        job_url:          editUrl.value,
+        applied_date:     editApplied.value || null,
+        interviewed_date: editInterviewed.value || null,
+        reached_out_date: editReachedOut.value || null,
+        job_status:       editStatus.value,
+        match_percentage: editMatch.value || null,
+        notes:            editNotes.value,
+    };
+    const res = await fetch('/appwebaddress', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({body: data}),
+    });
+    const saved = await res.json();   // parse the saved row out of the response
+
+    // change the current job's values to updates ones
+    state.currentJob.company          = saved.company;
+    state.currentJob.job_url          = saved.job_url;
+    state.currentJob.applied_date     = saved.applied_date;
+    state.currentJob.interviewed_date = saved.interviewed_date;
+    state.currentJob.reached_out_date = saved.reached_out_date;
+    state.currentJob.job_status       = saved.job_status;
+    state.currentJob.match_percentage = saved.match_percentage;
+    state.currentJob.notes            = saved.notes;
   }
   
 async function load() {
@@ -118,42 +207,38 @@ async function load_recent_job_tiles() {
         tile.addEventListener("mousedown", function() {
             // set state
             state.currentJob = r;
+            state.isEditing = false;   // a fresh tile click always starts in view mode
 
-            // make edit button visible
-            editButton.style.display = "";
-
-            // remove empty panel boilerplate text, to make way to detailed display of selected job info
+            // remove empty panel boilerplate text, reveal the detail pane
             detailEmpty.style.display = "none";
+            detailContent.style.display = "";
 
             tile.style.backgroundColor = "lightblue";
 
-            // in right display pane
-            detailContent.style.display = "";
-
-            detailStatus.textContent = r.job_status;
-            detailApplied.textContent = r.applied_date;
-            detailInterviewed.textContent = r.interviewed_date;
-            detailReachedOut.textContent = r.reached_out_date;
-            detailMatch.textContent = r.match_percentage;
-            detailUrl.textContent = r.job_url;
-            detailNotes.textContent = r.notes;
+            render();   // paint the detail panel from state
         });
         tile.addEventListener("mouseup", function() {
             tile.style.backgroundColor = "white";
         });
-
-        editButton.addEventListener("mousedown", function() {
-            state.isEditing = true;
-            render();
-        });
-
-        document.getElementById("edit_button").addEventListener("mouseup", function() {
-            state.isEditing = false;
-            render();
-        });
     }
 }
 
+editButton.addEventListener("click", function() {
+    state.isEditing = !state.isEditing;   // toggle: true→false, false→true
+    render();
+});
+
+cancelButton.addEventListener("click", async () => {
+    state.isEditing = false;
+    render();
+});
+
+submitButton.addEventListener("click", async () => {
+    await update_table();
+    state.isEditing = false;
+    render();
+});
+
 load_recent_job_tiles();
-document.getElementById('submit').addEventListener('click', submit);
-load();
+// document.getElementById('submit').addEventListener('click', submit);
+// load();

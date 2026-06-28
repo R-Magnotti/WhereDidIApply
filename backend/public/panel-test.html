@@ -46,6 +46,9 @@
       <p id="detail-empty">Select a job to see details.</p>
       <div id="detail-content" style="display:none;">
         <h2 id="detail-company"></h2>
+        <p><strong>Company:</strong> <span id="detail-company"></span></p>
+        <textarea id="company_textarea" style="display:none;"></textarea>
+
         <p><strong>Status:</strong> <span id="detail-status"></span></p>
         <select id="status_dropdown" style="display:none;">
             <option>SAVED</option>
@@ -56,13 +59,14 @@
         </select>
 
         <p><strong>Applied:</strong> <span id="detail-applied"></span></p>
-        <textarea id="applied_textarea" style="display:none;"></textarea>
+        <input id="applied_date_select" type="date" style="display:none;">
+
 
         <p><strong>Interviewed:</strong> <span id="detail-interviewed"></span></p>
-        <textarea id="interviewed_textarea" style="display:none;"></textarea>
+        <input id="interviewed_date_select" type="date" style="display:none;">
 
         <p><strong>Reached out:</strong> <span id="detail-reached-out"></span></p>
-        <textarea id="reached_out_textarea" style="display:none;"></textarea>
+        <input id="reached_out_date_select" type="date" style="display:none;">
 
         <p><strong>Match %:</strong> <span id="detail-match"></span></p>
         <textarea id="match_textarea" style="display:none;"></textarea>
@@ -75,6 +79,8 @@
         <textarea id="notes_textarea" style="display:none;"></textarea>
       </div>
       <button id="edit_button" style="display:none;">Edit</button>
+      <button id="cancel_button" style="display:none;">Cancel</button>
+      <button id="submit_button" style="display:none;">Submit</button>
     </div>
 
   </div>

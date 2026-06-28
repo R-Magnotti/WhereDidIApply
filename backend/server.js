@@ -33,17 +33,49 @@ app.post('/appwebaddress', async (req, res) => {
     // now get actual variables contained in message, parity with frontend js
     const company = data.company;
     const job_url = data.job_url;
+    const interviewed_date = data.interviewed_date;
+    const reached_out_date = data.reached_out_date;
     const applied_date = data.applied_date;
     const job_status = data.job_status;
     const match_percentage = data.match_percentage;
     const notes = data.notes;
   
     const result = await pool.query(
-      'INSERT INTO jobapps (company, job_url, applied_date, job_status, match_percentage, notes) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [company, job_url, applied_date, job_status, match_percentage, notes]
+      'INSERT INTO jobapps (company, job_url, interviewed_date, reached_out_date, applied_date, job_status, match_percentage, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+      [company, job_url, applied_date, interviewed_date, reached_out_date, job_status, match_percentage, notes]
     );
   
     res.status(201).json(result.rows[0]);
+  });
+
+///////// PUT (update not add) /////////  
+// --- Routes ---
+app.put('/appwebaddress', async (req, res) => {
+    // get body of HTML message
+    const { body } = req.body;
+  
+    if (!body) {
+      return res.status(400).json({ error: 'body is required' });
+    }
+
+    data = body
+    // now get actual variables contained in message, parity with frontend js
+    const id = data.job_id;
+    const company = data.company;
+    const job_url = data.job_url;
+    const interviewed_date = data.interviewed_date;
+    const reached_out_date = data.reached_out_date;
+    const applied_date = data.applied_date;
+    const job_status = data.job_status;
+    const match_percentage = data.match_percentage;
+    const notes = data.notes;
+  
+    const result = await pool.query(
+        'UPDATE jobapps SET company=$1, job_url=$2, applied_date=$3, interviewed_date=$4, reached_out_date=$5, job_status=$6, match_percentage=$7, notes=$8 WHERE id=$9 RETURNING *', 
+        [company, job_url, applied_date, interviewed_date, reached_out_date, job_status, match_percentage, notes, id]
+    );
+    console.log(`UPDATE ok: id=${id}`, result.rows[0]);
+    res.status(201).json(result.rows[0]);    //send completed response to browser
   });
 
 ///////// GET /////////  
