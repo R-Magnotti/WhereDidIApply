@@ -1,3 +1,8 @@
+const editButton = document.getElementById("edit_button");
+const submitButton = document.getElementById("submit_button");
+const cancelButton = document.getElementById("cancel_button");
+const deleteButton = document.getElementById("delete_button");
+
 const detailEmpty = document.getElementById("detail-empty");
 const detailContent = document.getElementById("detail-content");
 const detailCompany = document.getElementById("detail-company");
@@ -8,10 +13,6 @@ const detailReachedOut = document.getElementById("detail-reached-out");
 const detailMatch = document.getElementById("detail-match");
 const detailUrl = document.getElementById("detail-url");
 const detailNotes = document.getElementById("detail-notes");
-
-const editButton = document.getElementById("edit_button");
-const submitButton = document.getElementById("submit_button");
-const cancelButton = document.getElementById("cancel_button");
 
 const editCompany = document.getElementById("company_textarea");
 const editStatus = document.getElementById("status_dropdown");
@@ -124,6 +125,7 @@ function render() {
     }
 } 
 
+////// POST //////
 async function submit() {
     const data = {
       company:          document.getElementById('company').value,
@@ -143,7 +145,8 @@ async function submit() {
     load();
   }
 
-async function update_table() {
+////// PUT / UPDATE //////
+async function update_row() {
     const data = {
         job_id:           state.currentJob.id,
         company:          editCompany.value,
@@ -171,18 +174,16 @@ async function update_table() {
     state.currentJob.job_status       = saved.job_status;
     state.currentJob.match_percentage = saved.match_percentage;
     state.currentJob.notes            = saved.notes;
-  }
-  
-async function load() {
-const res = await fetch('/appwebaddress');
-const rows = await res.json();
-const list = document.getElementById('list');
-list.innerHTML = '';
-for (const r of rows) {
-    const li = document.createElement('li');
-    li.textContent = r.company + ' — ' + r.job_status;
-    list.appendChild(li);
 }
+
+////// DELETE ROW //////
+async function del_row(jobId){
+    const res = await fetch('/appwebaddress', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({body: {job_id: jobId}}),
+    });
+    return res;   // so the caller can check if it worked
 }
 
 async function load_recent_job_tiles() {
@@ -201,7 +202,28 @@ async function load_recent_job_tiles() {
         status.className = "status";
         status.textContent = r.status;
 
-        tile.append(company, status);
+        // left side: company + status stacked together
+        const info = document.createElement("div");
+        info.append(company, status);
+
+        // right side: trash can
+        const trash = document.createElement("span");
+        trash.className = "trash";
+        trash.textContent = "🗑️";
+        trash.addEventListener("mousedown", function(e) {
+            e.stopPropagation();   // stop the tile's mousedown from firing when clicking on trash specifically
+        });
+        
+        trash.addEventListener("click", async function(e) {
+            e.stopPropagation();    // defensive: keep this click from bubbling to the tile
+            const res = await del_row(r.id);
+            if (res.ok) {
+                tile.remove();   // only remove the tile if the server actually deleted it
+            }
+        });
+        
+
+        tile.append(info, trash);
 
         document.getElementById("list-panel").appendChild(tile);
         tile.addEventListener("mousedown", function() {
@@ -228,16 +250,29 @@ editButton.addEventListener("click", function() {
     render();
 });
 
-cancelButton.addEventListener("click", async () => {
+cancelButton.addEventListener("click", function () {
     state.isEditing = false;
     render();
 });
 
 submitButton.addEventListener("click", async () => {
-    await update_table();
+    await update_row();
     state.isEditing = false;
     render();
 });
+
+
+async function load() {
+    const res = await fetch('/appwebaddress');
+    const rows = await res.json();
+    const list = document.getElementById('list');
+    list.innerHTML = '';
+    for (const r of rows) {
+        const li = document.createElement('li');
+        li.textContent = r.company + ' — ' + r.job_status;
+        list.appendChild(li);
+    }
+    }
 
 load_recent_job_tiles();
 // document.getElementById('submit').addEventListener('click', submit);

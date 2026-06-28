@@ -58,7 +58,7 @@ app.put('/appwebaddress', async (req, res) => {
       return res.status(400).json({ error: 'body is required' });
     }
 
-    data = body
+   const data = body;
     // now get actual variables contained in message, parity with frontend js
     const id = data.job_id;
     const company = data.company;
@@ -85,28 +85,31 @@ app.get('/appwebaddress', async (req, res) => {
     res.json(result.rows);
   });
 
-///////// DELETE /////////  
-async function deleteEntry(entryId) {
-// define the parameterized DELETE query
-const text = 'DELETE FROM users WHERE id = $1 RETURNING *';
-const values = [entryId];
+///////// DELETE /////////
+app.delete('/appwebaddress', async (req, res) => {
+    const { body } = req.body;
 
-try {
-    // execute the query
-    const res = await pool.query(text, values);
-    
-    if (res.rowCount === 0) {
-    console.log('No entry found with that ID.');
-    } else {
-    console.log('Successfully deleted:', res.rows[0]); // Returns the deleted row data
+    if (!body) {
+      return res.status(400).json({ error: 'body is required' });
     }
-} catch (err) {
-    console.error('Error executing query:', err.stack);
-} finally {
-    // close the pool connection when done
-    await pool.end();
-}
-}
+
+    const data = body;
+    const id = data.job_id;
+    if (!id) {
+      return res.status(400).json({ error: 'id is required' });
+    }
+
+    const result = await pool.query(
+        'DELETE FROM jobapps WHERE id=$1 RETURNING *', [id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'no job found with that id' });
+    }
+
+    console.log('Successfully deleted:', result.rows[0]);
+    res.json(result.rows); // send back confirmation
+});
 
 // --- Start the server ---
 const PORT = 3000;
