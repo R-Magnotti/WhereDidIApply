@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Job Tracker</title>
+<style>
+  #list-panel {
+    width: 280px;
+    overflow-y: auto;
+    height: 100vh;
+    overflow-y: auto;
+    border-right: 1px solid #ccc;
+  }
+
+  #tile_menu {
+    display: flex; 
+    justify-content: right;   /* horizontal centering */
+    align-items: center;       /* vertical centering */
+  }
+  
+  .tile {
+    padding: 12px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .tile .trash {
+    cursor: pointer;
+    margin-left: 8px;
+  }
+  .tile .trash:hover {
+    filter: sepia(1) saturate(10000%) hue-rotate(-30deg);
+  }
+  .tile:hover {
+    background: #f5f5f5;
+  }
+  .tile .company {
+    font-weight: bold;
+  }
+  .tile .status {
+    font-size: 13px;
+    color: #666;
+  }
+
+  #detail-panel {
+    flex: 1;
+    padding: 20px;
+    height: 100vh;
+    overflow-y: auto;
+  }
+</style>
+</head>
+<body style="margin:0; font-family: sans-serif;">
+
+  <!-- **** TILE (left) PANEL ***** -->
+  <div style="display:flex; height:100vh;">
+    <div id="list-panel">
+      <div id="tile_menu"><button id="add_button">+</button></div>  
+      <div id="tiles"></div>   
+      <!-- tiles get added here by JS -->
+    </div>
+
+  <!-- **** DISPLAY (right) PANEL ***** -->
+  <div id="detail-panel">
+    <p id="detail-empty">Select a job to see details.</p>
+    <div id="detail-content" style="display:none;">
+      <h2 id="detail-company"></h2>
+      <p><strong>Company:</strong> <span id="detail-company"></span></p>
+      <textarea id="company_textarea" style="display:none;"></textarea>
+
+      <p><strong>Status:</strong> <span id="detail-status"></span></p>
+      <select id="status_dropdown" style="display:none;">
+          <option>SAVED</option>
+          <option>PENDING</option>
+          <option>INTERVIEW</option>
+          <option>OFFER</option>
+          <option>REJECTED</option>
+      </select>
+
+      <p><strong>Interest:</strong> <span id="detail-interest"></span></p>
+      <select id="interest_dropdown" style="display:none;">
+          <option value="">—</option>
+          <option>Rep Farm</option>
+          <option>Safety</option>
+          <option>Priority</option>
+      </select>
+
+      <p><strong>Applied:</strong> <span id="detail-applied"></span></p>
+      <input id="applied_date_select" type="date" style="display:none;">
+
+
+      <p><strong>Interviewed:</strong> <span id="detail-interviewed"></span></p>
+      <input id="interviewed_date_select" type="date" style="display:none;">
+
+      <p><strong>Reached out:</strong> <span id="detail-reached-out"></span></p>
+      <input id="reached_out_date_select" type="date" style="display:none;">
+
+      <p><strong>Match %:</strong> <span id="detail-match"></span></p>
+      <textarea id="match_textarea" style="display:none;"></textarea>
+
+      <p><strong>Link:</strong> <a id="detail-url" href="#" target="_blank"></a></p>
+      <textarea id="url_textarea" style="display:none;"></textarea>
+
+      <p><strong>Notes:</strong></p>
+      <p id="detail-notes"></p>
+      <textarea id="notes_textarea" style="display:none;"></textarea>
+    </div>
+    <button id="edit_button" style="display:none;">Edit</button>
+    <button id="cancel_button" style="display:none;">Cancel</button>
+    <button id="submit_button" style="display:none;">Submit</button>
+  </div>
+
+  </div>
+
+  <script src="job_view.js"></script>
+</body>
+</html>
