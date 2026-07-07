@@ -5,6 +5,15 @@ PUT: modify row in data table
 DELETE: remove row from data table
 *******************************/
 
+// re-fetch and rebuild the state every time data is passed to or from the DB
+// i made the SQL table the authority
+async function refreshStateData() {
+    const rows = await (await fetch('/appwebaddress')).json();
+    state.jobs = {};
+    for (const r of rows) state.jobs[r.id] = r; // server rows = source of truth
+    render();
+  }
+
 ////// PUT / UPDATE //////
 async function update_row() {
     const data = {
@@ -109,6 +118,66 @@ function scrubDom(){
 }
 
 function showForm(mode) {
+    console.log(`in showForm: passed -- ${mode}`)
+
+    if (mode === "view") {
+        /////// PAINT DISPLAY VALUES FROM STATE ///////
+        if (state.currentJob) {
+            // right panel view
+            detailCompany.textContent      = state.currentJob.company;
+            detailStatus.textContent       = state.currentJob.job_status;
+            detailInterest.textContent     = state.currentJob.interest;
+            detailApplied.textContent      = state.currentJob.applied_date;
+            detailInterviewed.textContent  = state.currentJob.interviewed_date;
+            detailReachedOut.textContent   = state.currentJob.reached_out_date;
+            detailMatch.textContent        = state.currentJob.match_percentage;
+            detailUrl.textContent          = state.currentJob.job_url;
+            detailNotes.textContent        = state.currentJob.notes;
+        }
+
+        /* SHOW ALL POPULATED BOXES WITH DATA PERTAINING TO THE SELECTED JOB TILE */
+        editButton.style.display = "";
+        submitButton.style.display = "none";
+
+        // COMPANY
+        detailCompany.style.display = "";
+        editCompany.style.display = "none";
+
+        // STATUS
+        detailStatus.style.display = "";    // start display current value
+        editStatus.style.display = "none";           // stop display editable element
+
+        // INTEREST
+        detailInterest.style.display = "";
+        editInterest.style.display = "none";
+
+        // APPLIED DATE
+        detailApplied.style.display = "";
+        editApplied.style.display = "none";
+
+        // INTERVIEWED DATE
+        detailInterviewed.style.display = "";
+        editInterviewed.style.display = "none";
+
+        // REACHED OUT TO RECRUITER DATE
+        detailReachedOut.style.display = "";
+        editReachedOut.style.display = "none";
+
+        // MATCH PERCENTAGE
+        detailMatch.style.display = "";
+        editMatch.style.display = "none";
+
+        // JOB URL
+        detailUrl.style.display = "";
+        editUrl.style.display = "none";
+
+        // NOTES
+        detailNotes.style.display = "";
+        editNotes.style.display = "none";
+
+        return;
+    }
+
     // if displaying elements for an edit, pre-populate each field with current vals
     if (mode === "edit") {
         cancelButton.style.display = "";
@@ -122,6 +191,9 @@ function showForm(mode) {
         editUrl.value = state.currentJob.job_url;
         editNotes.value = state.currentJob.notes;
     }
+
+    // the following covers if "add" mode too
+
     editButton.style.display = "none";
     submitButton.style.display = "";
 
@@ -166,7 +238,7 @@ class State {
     constructor() {
         this.mode = null;
         this.currentJob = null;
-        this.jobs  =[];
+        this.jobs = {};
     }
 
     // data: dict of parameters to update
@@ -174,6 +246,7 @@ class State {
     update(mode, data) {
         if (mode === "edit") {
             // change the current job's values to updates ones
+            state.id                          = data.id;
             state.currentJob.company          = data.company;
             state.currentJob.job_url          = data.job_url;
             state.currentJob.applied_date     = data.applied_date;
@@ -186,7 +259,7 @@ class State {
         }
         else if (mode === "add") {
             let new_job = data;
-            state.jobs.push(new_job);
+            state.jobs[data.id] = new_job;
         }
     }
 }
@@ -204,15 +277,26 @@ function setMode(mode) {
 }
 setMode("view")
 
+// render the job tiles LEFT HAND panel
 function renderTiles(){
     // const panel = document.getElementById("list-panel");
     const panel = document.getElementById("tiles");   // was "list-panel"
 
     panel.innerHTML = "";                 // clear what's there
-    for (const r of state.jobs) {
+
+    // sort chronologically: oldest applied_date first; missing dates sink to the bottom
+    const jobs = Object.values(state.jobs).sort((a, b) => {
+        const da = a.applied_date ? new Date(a.applied_date).getTime() : Infinity;
+        const db = b.applied_date ? new Date(b.applied_date).getTime() : Infinity;
+        return da - db;
+    });
+
+    for (const r of jobs) {
         // create a new tile for each row
         const tile = document.createElement("div");
         tile.className = "tile";
+
+        tile.dataset.id = r.id;   // instead of closing over r.id in a per-tile listener
 
         const company = document.createElement("div");
         company.className = "company";
@@ -247,9 +331,22 @@ function renderTiles(){
     }
   }
 
-function render() {
+// to render (RIGHT SIDE) the detail-view of current job
+function renderDetail() {
     console.log("In render function.")
     console.log(`Current state: ${state.mode}`)
+
+    // container visibility is a function of state — decided in one place
+    const hasContent = state.mode === "add" || state.mode === "edit" || !!state.currentJob;
+    if (hasContent) {
+        // we have something to show (a selected job, or we're adding/editing one)
+        detailContent.style.display = "";      // show the detail/form box
+        detailEmpty.style.display   = "none";  // hide the "Select a job" placeholder
+    } else {
+        // nothing selected and not adding — show the placeholder instead
+        detailContent.style.display = "none";  // hide the detail/form box
+        detailEmpty.style.display   = "";      // show the "Select a job" placeholder
+    }
 
     if (state.mode === "edit") {
         console.log("In state.mode: edit")
@@ -257,93 +354,25 @@ function render() {
     } 
     else if (state.mode === "view") {
         console.log(`In render().view`)
+
         /////// TOGGLE DISPLAY ITEMS ///////
         showForm(state.mode);
-
-        /////// PAINT DISPLAY VALUES FROM STATE ///////
-        if (state.currentJob) {
-            // right panel view
-            detailCompany.textContent      = state.currentJob.company;
-            detailStatus.textContent       = state.currentJob.job_status;
-            detailInterest.textContent     = state.currentJob.interest;
-            detailApplied.textContent      = state.currentJob.applied_date;
-            detailInterviewed.textContent  = state.currentJob.interviewed_date;
-            detailReachedOut.textContent   = state.currentJob.reached_out_date;
-            detailMatch.textContent        = state.currentJob.match_percentage;
-            detailUrl.textContent          = state.currentJob.job_url;
-            detailNotes.textContent        = state.currentJob.notes;
-        }
     }
     else if (state.mode === "add") {
         console.log("In state.mode: add")
 
         // clear the DOM
         scrubDom()
-        showForm();
+        showForm(state.mode);
     }
 } 
 
-async function load_recent_job_tiles() {
-    const res = await fetch('/appwebaddress');  // get all rows, organized in desc order or recency
-    const rows = await res.json();
-    for (const r of rows) {
-        // create a new tile for each row
-        const tile = document.createElement("div");
-        tile.className = "tile";
-
-        const company = document.createElement("div");
-        company.className = "company";
-        company.textContent = r.company;
-
-        const status = document.createElement("div");
-        status.className = "status";
-        status.textContent = r.status;
-
-        // left side: company + status stacked together
-        const info = document.createElement("div");
-        info.append(company, status);
-
-        // right side: trash can
-        const trash = document.createElement("span");
-        trash.className = "trash";
-        trash.textContent = "🗑️";
-        trash.addEventListener("mousedown", function(e) {
-            e.stopPropagation();   // stop the tile's mousedown from firing when clicking on trash specifically
-        });
-        
-        trash.addEventListener("click", async function(e) {
-            e.stopPropagation();    // defensive: keep this click from bubbling to the tile
-            const res = await del_row(r.id);
-            if (res.ok) {
-                tile.remove();   // only remove the tile if the server actually deleted it
-            }
-        });
-        
-        tile.append(info, trash);
-
-        document.getElementById("list-panel").appendChild(tile);
-        tile.addEventListener("mousedown", function() {
-            console.log(`Clicked a tile.`)
-
-            // set state
-            state.currentJob = r;
-            state.jobs.push(r)
-            setMode("view");   // a fresh tile click always starts in view mode
-
-            // remove empty panel boilerplate text, reveal the detail pane
-            detailEmpty.style.display = "none";
-            detailContent.style.display = "";
-
-            tile.style.backgroundColor = "lightblue";
-
-            render();   // paint the detail panel from state
-        });
-        tile.addEventListener("mouseup", function() {
-            tile.style.backgroundColor = "white";
-        });
-    }
+function render() {
+    renderDetail();
+    renderTiles();
 }
 
+// edit button listener
 editButton.addEventListener("click", function() {
     // toggle true false edit / view
     if (state.mode === "edit") {
@@ -357,11 +386,18 @@ editButton.addEventListener("click", function() {
     render();
 });
 
+addButton.addEventListener("click", function() {
+    setMode("add");
+    render();
+});
+
+// cancel button listener
 cancelButton.addEventListener("click", function () {
     setMode("view");
     render();
 });
 
+// submit button listener
 submitButton.addEventListener("click", async () => {
     let data = null;
     if (state.mode === "edit") {
@@ -370,18 +406,27 @@ submitButton.addEventListener("click", async () => {
     else if (state.mode === "add") {
         data = await submit();
     }
+    refreshStateData(); // update state
     state.update(state.mode, data)   // pass mode; must run while mode is still "add"/"edit"
     setMode("view");
-    renderTiles()
     render();
 });
 
-addButton.addEventListener("click", function() {
-    setMode("add");
+// tile click listener
+document.getElementById("tiles").addEventListener("click", (e) => {
+    if (e.target.closest(".trash")) return;              // trash has its own handler
+    const tile = e.target.closest(".tile");              // .tile — class (NOT a tag)
+    if (!tile) return;
+  
+    // rehydrate the full record from the one source of truth
+    state.currentJob = state.jobs[Number(tile.dataset.id)];
+    setMode("view");
+  
+    detailEmpty.style.display = "none";
     detailContent.style.display = "";
-    console.log("Clicked add button, now transitioning to add page view.")
-    render();
-});
 
-load_recent_job_tiles();
-renderTiles();
+    refreshStateData(); // update state
+    render();                                             // highlight lives in renderTiles now
+  });
+  
+refreshStateData();
