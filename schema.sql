@@ -10,5 +10,11 @@ CREATE TABLE IF NOT EXISTS jobapps (
     interest TEXT CHECK (interest IN ('Rep Farm', 'Safety', 'Priority')),
     match_percentage FLOAT CHECK (match_percentage BETWEEN 0 AND 100),
     reached_out_date DATE,
-    notes TEXT
+    notes TEXT,
+    role TEXT,
+    lane TEXT CHECK (lane in ('DE', 'SWE', 'AI', 'DS', 'DA')),
+    salary DECIMAL, -- mid point of salary band
+    min_salary DECIMAL, 
+    max_salary DECIMAL,
+    req_num TEXT
 );

@@ -19,6 +19,8 @@ async function update_row() {
     const data = {
         job_id:           state.currentJob.id,
         company:          editCompany.value,
+        role:             editRole.value,
+        req_num:          editReqNum.value,
         job_url:          editUrl.value,
         applied_date:     editApplied.value || null,
         interviewed_date: editInterviewed.value || null,
@@ -51,6 +53,8 @@ async function del_row(jobId){
 async function submit() {
     const data = {
       company:          editCompany.value,
+      role:             editRole.value,
+      req_num:          editReqNum.value,
       job_url:          editUrl.value,
       applied_date:     editApplied.value || null,
       interviewed_date: editInterviewed.value || null,
@@ -84,6 +88,8 @@ const detailEmpty = document.getElementById("detail-empty");
 const detailContent = document.getElementById("detail-content");
 
 const detailCompany = document.getElementById("detail-company");
+const detailRole = document.getElementById("detail-role");
+const detailReqNum = document.getElementById("detail-req-num");
 const detailStatus = document.getElementById("detail-status");
 const detailInterest = document.getElementById("detail-interest");
 const detailApplied = document.getElementById("detail-applied");
@@ -95,6 +101,8 @@ const detailNotes = document.getElementById("detail-notes");
 
 // right panel when editing details -- EDIT mode
 const editCompany = document.getElementById("company_textarea");
+const editRole = document.getElementById("role_textarea");
+const editReqNum = document.getElementById("req_num_textarea");
 const editStatus = document.getElementById("status_dropdown");
 const editInterest = document.getElementById("interest_dropdown");
 const editApplied = document.getElementById("applied_date_select");
@@ -107,6 +115,8 @@ const editNotes = document.getElementById("notes_textarea");
 // function to wipe reused elements' values
 function scrubDom(){
     editCompany.value      = "";
+    editRole.value         = "";
+    editReqNum.value       = "";
     editStatus.value       = "";
     editInterest.value     = "";
     editApplied.value      = "";
@@ -125,6 +135,8 @@ function showForm(mode) {
         if (state.currentJob) {
             // right panel view
             detailCompany.textContent      = state.currentJob.company;
+            detailRole.textContent         = state.currentJob.role;
+            detailReqNum.textContent       = state.currentJob.req_num;
             detailStatus.textContent       = state.currentJob.job_status;
             detailInterest.textContent     = state.currentJob.interest;
             detailApplied.textContent      = state.currentJob.applied_date;
@@ -142,6 +154,14 @@ function showForm(mode) {
         // COMPANY
         detailCompany.style.display = "";
         editCompany.style.display = "none";
+
+        // ROLE
+        detailRole.style.display = "";
+        editRole.style.display = "none";
+
+        // REQ #
+        detailReqNum.style.display = "";
+        editReqNum.style.display = "none";
 
         // STATUS
         detailStatus.style.display = "";    // start display current value
@@ -182,6 +202,8 @@ function showForm(mode) {
     if (mode === "edit") {
         cancelButton.style.display = "";
         editCompany.value = state.currentJob.company;
+        editRole.value = state.currentJob.role ?? "";
+        editReqNum.value = state.currentJob.req_num ?? "";
         editStatus.value = state.currentJob.job_status;
         editInterest.value = state.currentJob.interest ?? "";
         editApplied.value = state.currentJob.applied_date?.slice(0, 10); // fixes ISO format
@@ -200,6 +222,14 @@ function showForm(mode) {
     // COMPANY
     detailCompany.style.display = "none";
     editCompany.style.display = "";
+
+    // ROLE
+    detailRole.style.display = "none";
+    editRole.style.display = "";
+
+    // REQ #
+    detailReqNum.style.display = "none";
+    editReqNum.style.display = "";
 
     // STATUS
     detailStatus.style.display = "none";    // stop display current value
@@ -248,6 +278,8 @@ class State {
             // change the current job's values to updates ones
             state.id                          = data.id;
             state.currentJob.company          = data.company;
+            state.currentJob.role             = data.role;
+            state.currentJob.req_num          = data.req_num;
             state.currentJob.job_url          = data.job_url;
             state.currentJob.applied_date     = data.applied_date;
             state.currentJob.interviewed_date = data.interviewed_date;
@@ -285,11 +317,15 @@ function renderTiles(){
     panel.innerHTML = "";                 // clear what's there
 
     // sort chronologically: oldest applied_date first; missing dates sink to the bottom
-    const jobs = Object.values(state.jobs).sort((a, b) => {
-        const da = a.applied_date ? new Date(a.applied_date).getTime() : Infinity;
-        const db = b.applied_date ? new Date(b.applied_date).getTime() : Infinity;
-        return da - db;
-    });
+    // const jobs = Object.values(state.jobs).sort((a, b) => {
+    //     const da = a.applied_date ? new Date(a.applied_date).getTime() : Infinity;
+    //     const db = b.applied_date ? new Date(b.applied_date).getTime() : Infinity;
+    //     return da - db;
+    // });
+
+    const jobs = Object.values(state.jobs).sort((a, b) =>
+        (a.company || "").localeCompare(b.company || "")
+    );    
 
     for (const r of jobs) {
         // create a new tile for each row

@@ -4,12 +4,37 @@
 <meta charset="UTF-8" />
 <title>Job Tracker</title>
 <style>
-  #list-panel {
-    width: 280px;
-    overflow-y: auto;
+  .app {
+    display: grid;
     height: 100vh;
+    box-sizing: border-box;
+    gap: 12px;
+    padding: 12px;
+    grid-template-columns: 280px 1fr;   /* tiles width | detail fills rest */
+    grid-template-rows: 200px 1fr;       /* viz height  | content fills rest */
+    grid-template-areas:
+      "top  top"
+      "list detail";
+  }
+
+  #top-panel {
+    grid-area: top;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    box-sizing: border-box;   /* keep padding + border inside the 200px row */
+    padding: 12px;
+    overflow-x: auto;         /* scroll sideways through all the viz */
+    overflow-y: hidden;
+    display: flex;            /* all the charts in one horizontal row */
+    align-items: center;
+    gap: 24px;
+  }
+
+  #list-panel {
+    grid-area: list;
     overflow-y: auto;
-    border-right: 1px solid #ccc;
+    border: 1px solid #ccc;
+    border-radius: 8px;
   }
 
   #tile_menu {
@@ -45,75 +70,88 @@
   }
 
   #detail-panel {
-    flex: 1;
+    grid-area: detail;
     padding: 20px;
-    height: 100vh;
     overflow-y: auto;
+    border: 1px solid #ccc;
+    border-radius: 8px;
   }
 </style>
 </head>
 <body style="margin:0; font-family: sans-serif;">
 
-  <!-- **** TILE (left) PANEL ***** -->
-  <div style="display:flex; height:100vh;">
+  <div class="app">
+    <!-- **** TILE (TOP) PANEL ***** -->
+    <div id="top-panel"></div>
+
+    <!-- **** TILE (left) PANEL ***** -->
     <div id="list-panel">
       <div id="tile_menu"><button id="add_button">+</button></div>  
       <div id="tiles"></div>   
       <!-- tiles get added here by JS -->
     </div>
 
-  <!-- **** DISPLAY (right) PANEL ***** -->
-  <div id="detail-panel">
-    <p id="detail-empty">Select a job to see details.</p>
-    <div id="detail-content" style="display:none;">
-      <h2 id="detail-company"></h2>
-      <p><strong>Company:</strong> <span id="detail-company"></span></p>
-      <textarea id="company_textarea" style="display:none;"></textarea>
+    <!-- **** DISPLAY (right) PANEL ***** -->
+    <div id="detail-panel">
+      <p id="detail-empty">Select a job to see details.</p>
+      <div id="detail-content" style="display:none;">
+        <h2 id="detail-company"></h2>
+        <p><strong>Company:</strong> <span id="detail-company"></span></p>
+        <textarea id="company_textarea" style="display:none;"></textarea>
 
-      <p><strong>Status:</strong> <span id="detail-status"></span></p>
-      <select id="status_dropdown" style="display:none;">
-          <option>SAVED</option>
-          <option>PENDING</option>
-          <option>INTERVIEW</option>
-          <option>OFFER</option>
-          <option>REJECTED</option>
-      </select>
+        <p><strong>Role:</strong> <span id="detail-role"></span></p>
+        <textarea id="role_textarea" style="display:none;"></textarea>
 
-      <p><strong>Interest:</strong> <span id="detail-interest"></span></p>
-      <select id="interest_dropdown" style="display:none;">
-          <option value="">—</option>
-          <option>Rep Farm</option>
-          <option>Safety</option>
-          <option>Priority</option>
-      </select>
+        <p><strong>Req #:</strong> <span id="detail-req-num"></span></p>
+        <textarea id="req_num_textarea" style="display:none;"></textarea>
 
-      <p><strong>Applied:</strong> <span id="detail-applied"></span></p>
-      <input id="applied_date_select" type="date" style="display:none;">
+        <p><strong>Status:</strong> <span id="detail-status"></span></p>
+        <select id="status_dropdown" style="display:none;">
+            <option>SAVED</option>
+            <option>PENDING</option>
+            <option>INTERVIEW</option>
+            <option>OFFER</option>
+            <option>REJECTED</option>
+        </select>
+
+        <p><strong>Interest:</strong> <span id="detail-interest"></span></p>
+        <select id="interest_dropdown" style="display:none;">
+            <option value="">—</option>
+            <option>Rep Farm</option>
+            <option>Safety</option>
+            <option>Priority</option>
+        </select>
+
+        <p><strong>Applied:</strong> <span id="detail-applied"></span></p>
+        <input id="applied_date_select" type="date" style="display:none;">
 
 
-      <p><strong>Interviewed:</strong> <span id="detail-interviewed"></span></p>
-      <input id="interviewed_date_select" type="date" style="display:none;">
+        <p><strong>Interviewed:</strong> <span id="detail-interviewed"></span></p>
+        <input id="interviewed_date_select" type="date" style="display:none;">
 
-      <p><strong>Reached out:</strong> <span id="detail-reached-out"></span></p>
-      <input id="reached_out_date_select" type="date" style="display:none;">
+        <p><strong>Reached out:</strong> <span id="detail-reached-out"></span></p>
+        <input id="reached_out_date_select" type="date" style="display:none;">
 
-      <p><strong>Match %:</strong> <span id="detail-match"></span></p>
-      <textarea id="match_textarea" style="display:none;"></textarea>
+        <p><strong>Match %:</strong> <span id="detail-match"></span></p>
+        <textarea id="match_textarea" style="display:none;"></textarea>
 
-      <p><strong>Link:</strong> <a id="detail-url" href="#" target="_blank"></a></p>
-      <textarea id="url_textarea" style="display:none;"></textarea>
+        <p><strong>Link:</strong> <a id="detail-url" href="#" target="_blank"></a></p>
+        <textarea id="url_textarea" style="display:none;"></textarea>
 
-      <p><strong>Notes:</strong></p>
-      <p id="detail-notes"></p>
-      <textarea id="notes_textarea" style="display:none;"></textarea>
+        <p><strong>Notes:</strong></p>
+        <p id="detail-notes"></p>
+        <textarea id="notes_textarea" style="display:none;"></textarea>
+      </div>
+      <button id="edit_button" style="display:none;">Edit</button>
+      <button id="cancel_button" style="display:none;">Cancel</button>
+      <button id="submit_button" style="display:none;">Submit</button>
     </div>
-    <button id="edit_button" style="display:none;">Edit</button>
-    <button id="cancel_button" style="display:none;">Cancel</button>
-    <button id="submit_button" style="display:none;">Submit</button>
-  </div>
 
-  </div>
+    </div>
 
-  <script src="job_view.js"></script>
+    <script src="job_view.js"></script>
+    <!-- Chart.js from CDN — must load before analytics_view.js so `Chart` exists -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+    <script src="analytics_view.js"></script>
 </body>
 </html>
