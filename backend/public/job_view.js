@@ -27,6 +27,7 @@ async function update_row() {
         reached_out_date: editReachedOut.value || null,
         job_status:       editStatus.value,
         interest:         editInterest.value || null,
+        lane:             editLane.value || null,
         match_percentage: editMatch.value || null,
         notes:            editNotes.value,
     };
@@ -61,6 +62,7 @@ async function submit() {
       reached_out_date: editReachedOut.value || null,
       job_status:       editStatus.value,
       interest:         editInterest.value || null,
+      lane:             editLane.value || null,
       match_percentage: editMatch.value || null,
       notes:            editNotes.value,
     };
@@ -92,6 +94,7 @@ const detailRole = document.getElementById("detail-role");
 const detailReqNum = document.getElementById("detail-req-num");
 const detailStatus = document.getElementById("detail-status");
 const detailInterest = document.getElementById("detail-interest");
+const detailLane = document.getElementById("detail-lane");
 const detailApplied = document.getElementById("detail-applied");
 const detailInterviewed = document.getElementById("detail-interviewed");
 const detailReachedOut = document.getElementById("detail-reached-out");
@@ -105,6 +108,7 @@ const editRole = document.getElementById("role_textarea");
 const editReqNum = document.getElementById("req_num_textarea");
 const editStatus = document.getElementById("status_dropdown");
 const editInterest = document.getElementById("interest_dropdown");
+const editLane = document.getElementById("lane_dropdown");
 const editApplied = document.getElementById("applied_date_select");
 const editInterviewed = document.getElementById("interviewed_date_select");
 const editReachedOut = document.getElementById("reached_out_date_select");
@@ -119,6 +123,7 @@ function scrubDom(){
     editReqNum.value       = "";
     editStatus.value       = "";
     editInterest.value     = "";
+    editLane.value         = "";
     editApplied.value      = "";
     editInterviewed.value  = "";
     editReachedOut.value   = "";
@@ -139,6 +144,7 @@ function showForm(mode) {
             detailReqNum.textContent       = state.currentJob.req_num;
             detailStatus.textContent       = state.currentJob.job_status;
             detailInterest.textContent     = state.currentJob.interest;
+            detailLane.textContent         = state.currentJob.lane;
             detailApplied.textContent      = state.currentJob.applied_date;
             detailInterviewed.textContent  = state.currentJob.interviewed_date;
             detailReachedOut.textContent   = state.currentJob.reached_out_date;
@@ -170,6 +176,10 @@ function showForm(mode) {
         // INTEREST
         detailInterest.style.display = "";
         editInterest.style.display = "none";
+
+        // LANE
+        detailLane.style.display = "";
+        editLane.style.display = "none";
 
         // APPLIED DATE
         detailApplied.style.display = "";
@@ -206,6 +216,7 @@ function showForm(mode) {
         editReqNum.value = state.currentJob.req_num ?? "";
         editStatus.value = state.currentJob.job_status;
         editInterest.value = state.currentJob.interest ?? "";
+        editLane.value = state.currentJob.lane ?? "";
         editApplied.value = state.currentJob.applied_date?.slice(0, 10); // fixes ISO format
         editInterviewed.value = state.currentJob.interviewed_date?.slice(0, 10); 
         editReachedOut.value = state.currentJob.reached_out_date?.slice(0, 10); 
@@ -238,6 +249,10 @@ function showForm(mode) {
     // INTEREST
     detailInterest.style.display = "none";
     editInterest.style.display = "";
+
+    // LANE
+    detailLane.style.display = "none";
+    editLane.style.display = "";
 
     // APPLIED DATE
     detailApplied.style.display = "none";
@@ -286,6 +301,7 @@ class State {
             state.currentJob.reached_out_date = data.reached_out_date;
             state.currentJob.job_status       = data.job_status;
             state.currentJob.interest         = data.interest;
+            state.currentJob.lane             = data.lane;
             state.currentJob.match_percentage = data.match_percentage;
             state.currentJob.notes            = data.notes;
         }

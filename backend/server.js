@@ -40,13 +40,14 @@ app.post('/appwebaddress', async (req, res) => {
     const applied_date = data.applied_date;
     const job_status = data.job_status;
     const interest = data.interest;
+    const lane = data.lane;
     const match_percentage = data.match_percentage;
     const notes = data.notes;
 
     // column list is kept in the same order as the params array so values land in the right columns
     const result = await pool.query(
-      'INSERT INTO jobapps (company, job_url, applied_date, interviewed_date, reached_out_date, job_status, interest, match_percentage, notes, role, req_num) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
-      [company, job_url, applied_date, interviewed_date, reached_out_date, job_status, interest, match_percentage, notes, role, req_num]
+      'INSERT INTO jobapps (company, job_url, applied_date, interviewed_date, reached_out_date, job_status, interest, match_percentage, notes, role, req_num, lane) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
+      [company, job_url, applied_date, interviewed_date, reached_out_date, job_status, interest, match_percentage, notes, role, req_num, lane]
     );
   
     res.status(201).json(result.rows[0]);
@@ -74,12 +75,13 @@ app.put('/appwebaddress', async (req, res) => {
     const applied_date = data.applied_date;
     const job_status = data.job_status;
     const interest = data.interest;
+    const lane = data.lane;
     const match_percentage = data.match_percentage;
     const notes = data.notes;
 
     const result = await pool.query(
-        'UPDATE jobapps SET company=$1, job_url=$2, applied_date=$3, interviewed_date=$4, reached_out_date=$5, job_status=$6, interest=$7, match_percentage=$8, notes=$9, role=$10, req_num=$11 WHERE id=$12 RETURNING *',
-        [company, job_url, applied_date, interviewed_date, reached_out_date, job_status, interest, match_percentage, notes, role, req_num, id]
+        'UPDATE jobapps SET company=$1, job_url=$2, applied_date=$3, interviewed_date=$4, reached_out_date=$5, job_status=$6, interest=$7, match_percentage=$8, notes=$9, role=$10, req_num=$11, lane=$12 WHERE id=$13 RETURNING *',
+        [company, job_url, applied_date, interviewed_date, reached_out_date, job_status, interest, match_percentage, notes, role, req_num, lane, id]
     );
     console.log(`UPDATE ok: id=${id}`, result.rows[0]);
     res.status(201).json(result.rows[0]);    //send completed response to browser
