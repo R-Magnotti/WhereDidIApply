@@ -372,6 +372,7 @@ function renderTiles(){
         
         trash.addEventListener("click", async function(e) {
             e.stopPropagation();    // defensive: keep this click from bubbling to the tile
+            if (!confirm("Delete this entry?")) return;
             const res = await del_row(r.id);
             if (res.ok) {
                 tile.remove();   // only remove the tile if the server actually deleted it
