@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS jobapps (
     reached_out_date DATE,
     notes TEXT,
     role TEXT,
-    lane TEXT CHECK (lane in ('DE', 'SWE', 'AI', 'DS', 'DA')),
+    lane TEXT CHECK (lane in ('DE', 'SWE', 'AI', 'DS', 'DA', 'SE/FDE')),
     salary DECIMAL, -- mid point of salary band
     min_salary DECIMAL, 
     max_salary DECIMAL,
