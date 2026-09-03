@@ -13,8 +13,12 @@ CREATE TABLE IF NOT EXISTS jobapps (
     notes TEXT,
     role TEXT,
     lane TEXT CHECK (lane in ('DE', 'SWE', 'AI', 'DS', 'DA', 'SE/FDE')),
-    salary DECIMAL, -- mid point of salary band
-    min_salary DECIMAL, 
+    salary DECIMAL, -- salary requested
+    min_salary DECIMAL,
     max_salary DECIMAL,
-    req_num TEXT
+    req_num TEXT,
+    -- one date per status, in pipeline order. applied_date is the PENDING date
+    -- and interviewed_date is the INTERVIEW date; these two complete the set.
+    offer_date DATE,
+    rejected_date DATE
 );

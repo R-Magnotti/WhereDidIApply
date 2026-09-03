@@ -16,6 +16,7 @@ async function refreshStateData() {
 
 ////// PUT / UPDATE //////
 async function update_row() {
+    const [min_salary, max_salary] = bandValue();
     const data = {
         job_id:           state.currentJob.id,
         company:          editCompany.value,
@@ -24,11 +25,16 @@ async function update_row() {
         job_url:          editUrl.value,
         applied_date:     editApplied.value || null,
         interviewed_date: editInterviewed.value || null,
+        offer_date:       editOffer.value || null,
+        rejected_date:    editRejected.value || null,
         reached_out_date: editReachedOut.value || null,
         job_status:       editStatus.value,
         interest:         editInterest.value || null,
         lane:             editLane.value || null,
         match_percentage: editMatch.value || null,
+        salary:           editSalary.value || null,
+        min_salary,
+        max_salary,
         notes:            editNotes.value,
     };
     const res = await fetch('/appwebaddress', {
@@ -52,6 +58,7 @@ async function del_row(jobId){
 
 ////// POST //////
 async function submit() {
+    const [min_salary, max_salary] = bandValue();
     const data = {
       company:          editCompany.value,
       role:             editRole.value,
@@ -59,11 +66,16 @@ async function submit() {
       job_url:          editUrl.value,
       applied_date:     editApplied.value || null,
       interviewed_date: editInterviewed.value || null,
+      offer_date:       editOffer.value || null,
+      rejected_date:    editRejected.value || null,
       reached_out_date: editReachedOut.value || null,
       job_status:       editStatus.value,
       interest:         editInterest.value || null,
       lane:             editLane.value || null,
       match_percentage: editMatch.value || null,
+      salary:           editSalary.value || null,
+      min_salary,
+      max_salary,
       notes:            editNotes.value,
     };
     const res = await fetch('/appwebaddress', {
@@ -82,7 +94,6 @@ DOM element handles
 const editButton = document.getElementById("edit_button");
 const submitButton = document.getElementById("submit_button");
 const cancelButton = document.getElementById("cancel_button");
-const deleteButton = document.getElementById("delete_button");
 const addButton = document.getElementById("add_button");
 
 // right panel when showing job details -- VIEW mode
@@ -99,6 +110,8 @@ const detailApplied = document.getElementById("detail-applied");
 const detailInterviewed = document.getElementById("detail-interviewed");
 const detailReachedOut = document.getElementById("detail-reached-out");
 const detailMatch = document.getElementById("detail-match");
+const detailBand = document.getElementById("detail-band");
+const detailSalary = document.getElementById("detail-salary");
 const detailUrl = document.getElementById("detail-url");
 const detailNotes = document.getElementById("detail-notes");
 
@@ -113,8 +126,146 @@ const editApplied = document.getElementById("applied_date_select");
 const editInterviewed = document.getElementById("interviewed_date_select");
 const editReachedOut = document.getElementById("reached_out_date_select");
 const editMatch = document.getElementById("match_textarea");
+const editBand = document.getElementById("band_slider");
+const editSalary = document.getElementById("salary_input");
 const editUrl = document.getElementById("url_textarea");
 const editNotes = document.getElementById("notes_textarea");
+const editOffer = document.getElementById("offer_date_select");
+const editRejected = document.getElementById("rejected_date_select");
+
+// status trail
+const statusGhosts = document.getElementById("status_ghosts");
+const statusCurrent = document.getElementById("status_current");
+const statusCurrentDate = document.getElementById("status_current_date");
+const dateDialog = document.getElementById("date_dialog");
+const dateDialogInput = document.getElementById("date_dialog_input");
+const dateDialogLabel = document.getElementById("date_dialog_label");
+
+// dual-handle salary band slider. 0-0 means no band recorded, same as NULL in the db
+noUiSlider.create(editBand, {
+    start: [0, 0],
+    connect: true,
+    step: 5000,
+    range: { min: 0, max: 300000 },
+    tooltips: true,
+    format: { to: n => Math.round(n), from: n => Number(n) },   // whole dollars, not "120000.00"
+});
+
+// "130000" -> "$130,000"
+function money(n) {
+    return n == null || n === "" ? "" : "$" + Number(n).toLocaleString();
+}
+
+// 0-0 means i never set a band, so store NULL instead of a fake one
+function bandValue() {
+    const [min, max] = editBand.noUiSlider.get();
+    return max === 0 ? [null, null] : [min, max];
+}
+
+// tick under the bar showing where the requested salary sits.
+// density -1 kills the filler pips, otherwise you get a whole scale
+function markRequested() {
+    const ask = Number(editSalary.value);
+    if (ask) {
+        editBand.noUiSlider.updateOptions({
+            pips: { mode: "values", values: [ask], density: -1, format: { to: money } },
+        });
+    } else {
+        editBand.noUiSlider.removePips();
+    }
+}
+
+/******************************
+Status trail
+each status has one date column, listed here in the order they happen.
+A status "happened" if its date box has a value in it.
+there's no separate history list to keep in step with job_status.
+*******************************/
+const TRAIL = [
+    { status: "PENDING",   input: editApplied },
+    { status: "INTERVIEW", input: editInterviewed },
+    { status: "OFFER",     input: editOffer },
+    { status: "REJECTED",  input: editRejected },
+];
+
+let statusBeforeChange = "";   // so Cancel in the date popup can put the dropdown back
+
+// find the TRAIL entry for a status, or null if that status has no date (SAVED)
+function stepFor(status) {
+    for (const step of TRAIL) {
+        if (step.status === status) {
+            return step;
+        }
+    }
+    return null;
+}
+
+// "2026-06-25" -> "6/25/2026"
+function fmtDate(isoDate) {
+    const parts = isoDate.split("-");
+    const year = parts[0];
+    const month = Number(parts[1]);
+    const day = Number(parts[2]);
+    return month + "/" + day + "/" + year;
+}
+
+// draw one box per status that has a date, oldest first.
+// while editing, the current status is the dropdown instead of a box.
+function renderStatusTrail(editing) {
+    statusGhosts.innerHTML = "";   // clear; we rebuild the whole trail every time
+    let boxesDrawn = 0;
+
+    for (const step of TRAIL) {
+        // no date means it never happened
+        if (!step.input.value) {
+            continue;
+        }
+        // the current status is the dropdown, not a box
+        if (editing && step.status === editStatus.value) {
+            continue;
+        }
+
+        const box = document.createElement("div");
+        box.className = "trail-chip";
+
+        const name = document.createElement("div");
+        name.textContent = step.status;
+
+        // first box is the application itself, removing it would blank applied_date
+        if (editing && boxesDrawn > 0) {
+            const remove = document.createElement("span");
+            remove.className = "trail-x";
+            remove.dataset.status = step.status;
+            remove.title = "remove this step";
+            remove.textContent = "×";
+            name.appendChild(remove);
+        }
+
+        const when = document.createElement("div");
+        when.className = "trail-date";
+        when.textContent = fmtDate(step.input.value);
+
+        box.appendChild(name);
+        box.appendChild(when);
+        statusGhosts.appendChild(box);
+        boxesDrawn++;
+    }
+
+    if (editing) {
+        statusCurrent.style.display = "";
+    } else {
+        statusCurrent.style.display = "none";
+    }
+
+    const current = stepFor(editStatus.value);
+    if (current && current.input.value) {
+        statusCurrentDate.textContent = fmtDate(current.input.value);
+    } else {
+        statusCurrentDate.textContent = "no date";
+    }
+
+    statusBeforeChange = editStatus.value;
+}
 
 // function to wipe reused elements' values
 function scrubDom(){
@@ -126,14 +277,18 @@ function scrubDom(){
     editLane.value         = "";
     editApplied.value      = "";
     editInterviewed.value  = "";
+    editOffer.value        = "";
+    editRejected.value     = "";
     editReachedOut.value   = "";
     editMatch.value        = "";
+    editSalary.value       = "";
     editUrl.value          = "";
     editNotes.value        = "";
+    editBand.noUiSlider.set([0, 0]);
+    markRequested();
 }
 
 function showForm(mode) {
-    console.log(`in showForm: passed -- ${mode}`)
 
     if (mode === "view") {
         /////// PAINT DISPLAY VALUES FROM STATE ///////
@@ -149,8 +304,19 @@ function showForm(mode) {
             detailInterviewed.textContent  = state.currentJob.interviewed_date;
             detailReachedOut.textContent   = state.currentJob.reached_out_date;
             detailMatch.textContent        = state.currentJob.match_percentage;
+            detailBand.textContent         = state.currentJob.min_salary
+                ? money(state.currentJob.min_salary) + " – " + money(state.currentJob.max_salary)
+                : "";
+            detailSalary.textContent       = money(state.currentJob.salary);
             detailUrl.textContent          = state.currentJob.job_url;
             detailNotes.textContent        = state.currentJob.notes;
+
+            // the trail always reads its dates out of these boxes, so load them in view mode too
+            editStatus.value      = state.currentJob.job_status;
+            editApplied.value     = state.currentJob.applied_date?.slice(0, 10) ?? "";
+            editInterviewed.value = state.currentJob.interviewed_date?.slice(0, 10) ?? "";
+            editOffer.value       = state.currentJob.offer_date?.slice(0, 10) ?? "";
+            editRejected.value    = state.currentJob.rejected_date?.slice(0, 10) ?? "";
         }
 
         /* SHOW ALL POPULATED BOXES WITH DATA PERTAINING TO THE SELECTED JOB TILE */
@@ -197,6 +363,14 @@ function showForm(mode) {
         detailMatch.style.display = "";
         editMatch.style.display = "none";
 
+        // SALARY BAND
+        detailBand.style.display = "";
+        editBand.style.display = "none";
+
+        // REQUESTED SALARY
+        detailSalary.style.display = "";
+        editSalary.style.display = "none";
+
         // JOB URL
         detailUrl.style.display = "";
         editUrl.style.display = "none";
@@ -205,6 +379,7 @@ function showForm(mode) {
         detailNotes.style.display = "";
         editNotes.style.display = "none";
 
+        renderStatusTrail(false);
         return;
     }
 
@@ -218,9 +393,14 @@ function showForm(mode) {
         editInterest.value = state.currentJob.interest ?? "";
         editLane.value = state.currentJob.lane ?? "";
         editApplied.value = state.currentJob.applied_date?.slice(0, 10); // fixes ISO format
-        editInterviewed.value = state.currentJob.interviewed_date?.slice(0, 10); 
-        editReachedOut.value = state.currentJob.reached_out_date?.slice(0, 10); 
+        editInterviewed.value = state.currentJob.interviewed_date?.slice(0, 10);
+        editOffer.value = state.currentJob.offer_date?.slice(0, 10) ?? "";
+        editRejected.value = state.currentJob.rejected_date?.slice(0, 10) ?? "";
+        editReachedOut.value = state.currentJob.reached_out_date?.slice(0, 10);
         editMatch.value = state.currentJob.match_percentage;
+        editSalary.value = state.currentJob.salary ?? "";
+        editBand.noUiSlider.set([Number(state.currentJob.min_salary) || 0, Number(state.currentJob.max_salary) || 0]);
+        markRequested();
         editUrl.value = state.currentJob.job_url;
         editNotes.value = state.currentJob.notes;
     }
@@ -270,6 +450,14 @@ function showForm(mode) {
     detailMatch.style.display = "none";
     editMatch.style.display = "";
 
+    // SALARY BAND
+    detailBand.style.display = "none";
+    editBand.style.display = "";
+
+    // REQUESTED SALARY
+    detailSalary.style.display = "none";
+    editSalary.style.display = "";
+
     // JOB URL
     detailUrl.style.display = "none";
     editUrl.style.display = "";
@@ -277,6 +465,8 @@ function showForm(mode) {
     // NOTES
     detailNotes.style.display = "none";
     editNotes.style.display = "";
+
+    renderStatusTrail(true);
 }
 
 class State {
@@ -287,7 +477,6 @@ class State {
     }
 
     // data: dict of parameters to update
-    // e.g. 
     update(mode, data) {
         if (mode === "edit") {
             // change the current job's values to updates ones
@@ -298,11 +487,16 @@ class State {
             state.currentJob.job_url          = data.job_url;
             state.currentJob.applied_date     = data.applied_date;
             state.currentJob.interviewed_date = data.interviewed_date;
+            state.currentJob.offer_date       = data.offer_date;
+            state.currentJob.rejected_date    = data.rejected_date;
             state.currentJob.reached_out_date = data.reached_out_date;
             state.currentJob.job_status       = data.job_status;
             state.currentJob.interest         = data.interest;
             state.currentJob.lane             = data.lane;
             state.currentJob.match_percentage = data.match_percentage;
+            state.currentJob.salary           = data.salary;
+            state.currentJob.min_salary       = data.min_salary;
+            state.currentJob.max_salary       = data.max_salary;
             state.currentJob.notes            = data.notes;
         }
         else if (mode === "add") {
@@ -321,23 +515,13 @@ function setMode(mode) {
     }
     const prev_mode = state.mode;
     state.mode = mode;
-    console.log(`Successfully changed from ${prev_mode} ==> ${state.mode}`) // use backtick ` or str format won't work
 }
 setMode("view")
 
 // render the job tiles LEFT HAND panel
 function renderTiles(){
-    // const panel = document.getElementById("list-panel");
-    const panel = document.getElementById("tiles");   // was "list-panel"
-
+    const panel = document.getElementById("tiles");
     panel.innerHTML = "";                 // clear what's there
-
-    // sort chronologically: oldest applied_date first; missing dates sink to the bottom
-    // const jobs = Object.values(state.jobs).sort((a, b) => {
-    //     const da = a.applied_date ? new Date(a.applied_date).getTime() : Infinity;
-    //     const db = b.applied_date ? new Date(b.applied_date).getTime() : Infinity;
-    //     return da - db;
-    // });
 
     const jobs = Object.values(state.jobs).sort((a, b) =>
         (a.company || "").localeCompare(b.company || "")
@@ -356,7 +540,7 @@ function renderTiles(){
 
         const status = document.createElement("div");
         status.className = "status";
-        status.textContent = r.status;
+        status.textContent = r.job_status;
 
         // left side: company + status stacked together
         const info = document.createElement("div");
@@ -386,8 +570,6 @@ function renderTiles(){
 
 // to render (RIGHT SIDE) the detail-view of current job
 function renderDetail() {
-    console.log("In render function.")
-    console.log(`Current state: ${state.mode}`)
 
     // container visibility is a function of state — decided in one place
     const hasContent = state.mode === "add" || state.mode === "edit" || !!state.currentJob;
@@ -402,17 +584,14 @@ function renderDetail() {
     }
 
     if (state.mode === "edit") {
-        console.log("In state.mode: edit")
         showForm(state.mode);
     } 
     else if (state.mode === "view") {
-        console.log(`In render().view`)
 
         /////// TOGGLE DISPLAY ITEMS ///////
         showForm(state.mode);
     }
     else if (state.mode === "add") {
-        console.log("In state.mode: add")
 
         // clear the DOM
         scrubDom()
@@ -435,7 +614,6 @@ editButton.addEventListener("click", function() {
         setMode("edit");
     }
 
-    console.log("setting mode to edit")
     render();
 });
 
@@ -448,6 +626,45 @@ addButton.addEventListener("click", function() {
 cancelButton.addEventListener("click", function () {
     setMode("view");
     render();
+});
+
+// redraw the requested-salary mark as the number is typed
+editSalary.addEventListener("input", markRequested);
+
+// picking a new status asks what date it happened on
+editStatus.addEventListener("change", function () {
+    const step = stepFor(editStatus.value);
+    if (!step) {
+        renderStatusTrail(true);   // SAVED has no date of its own, so nothing to ask
+        return;
+    }
+    dateDialogLabel.textContent = "Date this became " + editStatus.value;
+    // "en-CA" formats as YYYY-MM-DD, and it reads the local clock instead of UTC
+    dateDialogInput.value = step.input.value || new Date().toLocaleDateString("en-CA");
+    dateDialog.showModal();
+});
+
+// cancel or escape puts the dropdown back where it was
+dateDialog.addEventListener("close", function () {
+    const step = stepFor(editStatus.value);
+    if (dateDialog.returnValue === "ok" && step && dateDialogInput.value) {
+        step.input.value = dateDialogInput.value;
+    } else {
+        editStatus.value = statusBeforeChange;
+    }
+    renderStatusTrail(true);
+});
+
+// the × on a box drops that step out of the trail
+statusGhosts.addEventListener("click", function (e) {
+    const remove = e.target.closest(".trail-x");
+    if (!remove) return;
+
+    const step = stepFor(remove.dataset.status);
+    if (step) {
+        step.input.value = "";
+        renderStatusTrail(true);
+    }
 });
 
 // submit button listener
@@ -463,6 +680,7 @@ submitButton.addEventListener("click", async () => {
     state.update(state.mode, data)   // pass mode; must run while mode is still "add"/"edit"
     setMode("view");
     render();
+    loadAnalytics();
 });
 
 // tile click listener

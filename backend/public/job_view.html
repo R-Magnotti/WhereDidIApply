@@ -10,11 +10,36 @@
     box-sizing: border-box;
     gap: 12px;
     padding: 12px;
-    grid-template-columns: 280px 1fr;   /* tiles width | detail fills rest */
     grid-template-rows: 200px 1fr;       /* viz height  | content fills rest */
+    grid-template-columns: 280px 500px 1fr;
     grid-template-areas:
-      "top  top"
-      "list detail";
+      "top  top top"
+      "list detail extra-viz";
+  }
+
+  #extra-viz-panel {
+    grid-area: extra-viz;
+    display: flex;
+    flex-direction: column;      /* children stack top to bottom */
+    justify-content: flex-end;   /* stack to the bottom */
+    align-items: center;         /* horizontal centering */
+    overflow: auto;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 20px;
+  }
+
+  /* make heatmap github's size */
+  #calendar.heat-js {
+    /* heat.js pads each month to whole columns, so a year is ~64 columns.
+       total width is roughly 64 * (day-size + day-spacing) */
+    --heat-js-day-size: 10px; /* cell width */
+    --heat-js-day-spacing: 2px;
+    --heat-js-spacing: 6px;
+    --heat-js-spacing-font-size: 0.7rem;
+    --heat-js-default-width: 760px;   /* max-width is this + 50, has to clear the columns */
+
+    width: fit-content;
   }
 
   #top-panel {
@@ -28,6 +53,16 @@
     display: flex;            /* all the charts in one horizontal row */
     align-items: center;
     gap: 24px;
+  }
+
+  /* one chart slot in the top panel. flex-shrink so the row scrolls instead of squashing */
+  .chart-box {
+    height: 155px;
+    width: 280px;
+    flex-shrink: 0;
+  }
+  .chart-box.wide {
+    width: 400px;
   }
 
   #list-panel {
@@ -76,6 +111,63 @@
     border: 1px solid #ccc;
     border-radius: 8px;
   }
+
+  /* status trail: frozen chips for past statuses, live dropdown as the last chip */
+  #status_strip {
+    display: flex;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 4px 0 14px;
+  }
+  #status_ghosts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .trail-chip, #status_current {
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 5px 9px;
+    font-size: 13px;
+    min-width: 96px;
+  }
+  .trail-chip {
+    background: #f5f5f5;
+    color: #666;
+  }
+  #status_current {
+    border-color: #999;
+  }
+  .trail-date, #status_current_date {
+    font-size: 12px;
+    color: #888;
+    margin-top: 3px;
+  }
+  .trail-x {
+    cursor: pointer;
+    margin-left: 7px;
+    color: #b00;
+    font-weight: bold;
+  }
+  .trail-x:hover {
+    text-decoration: underline;
+  }
+
+  #date_dialog {
+    border: 1px solid #999;
+    border-radius: 8px;
+    padding: 18px;
+    font-family: sans-serif;
+  }
+  #date_dialog menu {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin: 14px 0 0;
+    padding: 0;
+  }
+
 </style>
 </head>
 <body style="margin:0; font-family: sans-serif;">
@@ -84,19 +176,21 @@
     <!-- **** TILE (TOP) PANEL ***** -->
     <div id="top-panel"></div>
 
-    <!-- **** TILE (left) PANEL ***** -->
+    <!-- **** TILE (bottom left) PANEL ***** -->
     <div id="list-panel">
       <div id="tile_menu"><button id="add_button">+</button></div>  
       <div id="tiles"></div>   
       <!-- tiles get added here by JS -->
     </div>
 
-    <!-- **** DISPLAY (right) PANEL ***** -->
+    <!-- **** VIZ (bottom right) PANEL ***** -->
+    <div id="extra-viz-panel"></div>
+
+    <!-- **** DISPLAY (bottom middle) PANEL ***** -->
     <div id="detail-panel">
       <p id="detail-empty">Select a job to see details.</p>
       <div id="detail-content" style="display:none;">
         <h2 id="detail-company"></h2>
-        <p><strong>Company:</strong> <span id="detail-company"></span></p>
         <textarea id="company_textarea" style="display:none;"></textarea>
 
         <p><strong>Role:</strong> <span id="detail-role"></span></p>
@@ -106,13 +200,23 @@
         <textarea id="req_num_textarea" style="display:none;"></textarea>
 
         <p><strong>Status:</strong> <span id="detail-status"></span></p>
-        <select id="status_dropdown" style="display:none;">
-            <option>SAVED</option>
-            <option>PENDING</option>
-            <option>INTERVIEW</option>
-            <option>OFFER</option>
-            <option>REJECTED</option>
-        </select>
+
+        <div id="status_strip">
+          <div id="status_ghosts"></div>
+          <div id="status_current">
+            <select id="status_dropdown" style="display:none;">
+                <option>SAVED</option>
+                <option>PENDING</option>
+                <option>INTERVIEW</option>
+                <option>OFFER</option>
+                <option>REJECTED</option>
+            </select>
+            <div id="status_current_date"></div>
+          </div>
+        </div>
+        <!-- written only by the trail; applied_date and interviewed_date already have their own rows -->
+        <input id="offer_date_select" type="date" style="display:none;">
+        <input id="rejected_date_select" type="date" style="display:none;">
 
         <p><strong>Interest:</strong> <span id="detail-interest"></span></p>
         <select id="interest_dropdown" style="display:none;">
@@ -146,6 +250,13 @@
         <p><strong>Match %:</strong> <span id="detail-match"></span></p>
         <textarea id="match_textarea" style="display:none;"></textarea>
 
+        <p><strong>Salary band:</strong> <span id="detail-band"></span></p>
+        <!-- margins leave room for the handle tooltips above and the requested-salary pip below -->
+        <div id="band_slider" style="display:none; margin: 34px 10px 40px;"></div>
+
+        <p><strong>Requested:</strong> <span id="detail-salary"></span></p>
+        <input id="salary_input" type="number" step="1000" style="display:none;">
+
         <p><strong>Link:</strong> <a id="detail-url" href="#" target="_blank"></a></p>
         <textarea id="url_textarea" style="display:none;"></textarea>
 
@@ -160,9 +271,28 @@
 
     </div>
 
+    <dialog id="date_dialog">
+      <form method="dialog">
+        <p id="date_dialog_label">Date of this status change</p>
+        <input id="date_dialog_input" type="date">
+        <menu>
+          <button value="cancel">Cancel</button>
+          <button value="ok">Confirm</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <!-- noUiSlider from CDN — must load before job_view.js so `noUiSlider` exists -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.8.1/nouislider.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.8.1/nouislider.min.js"></script>
     <script src="job_view.js"></script>
     <!-- Chart.js from CDN — must load before analytics_view.js so `Chart` exists -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+    <!-- sankey chart type for Chart.js — must load after it, it registers itself on load -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-sankey@0.15.0/dist/chartjs-chart-sankey.min.js"></script>
+    <!-- Heat.js from CDN — must load before analytics_view.js so `$heat` exists -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/williamtroup/Heat.js@5.2.0/dist/heat.js.min.css">
+    <script src="https://cdn.jsdelivr.net/gh/williamtroup/Heat.js@5.2.0/dist/heat.min.js"></script>
     <script src="analytics_view.js"></script>
 </body>
 </html>

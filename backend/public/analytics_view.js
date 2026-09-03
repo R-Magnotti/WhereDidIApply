@@ -1,41 +1,8 @@
 /******************************
-Analytics panel (top of job tracker app)
-Fetches all jobs from the DB and paints summary stats into #top-panel.
-Same source of truth as the tiles: GET /appwebaddress
+Analytics panel
+pulls pre-counted stats from GET /analytics and paints them into #top-panel
+and #extra-viz-panel. never sees a job row, the counting happens in SQL.
 *******************************/
-
-// build a raw table out of whatever rows a query handed back...
-// generic on purpose. it reads the column names off the first row,
-// so it works for appsPerStatus or other
-function renderTable(rows) {
-    // if no jobs, bail with a placeholder so the rows[0] lookup below doesn't blow up
-    if (!rows.length) return document.createTextNode("No data");
-
-    const table = document.createElement("table");
-
-    // header: one cell per column pulled from the keys of the first row
-    const headerRow = document.createElement("tr");
-    for (const columnName of Object.keys(rows[0])) {
-        const headerCell = document.createElement("th");
-        headerCell.textContent = columnName;
-        headerRow.appendChild(headerCell);
-    }
-    table.appendChild(headerRow);
-
-    // body: walk each row, drop one cell per value
-    for (const row of rows) {
-        const bodyRow = document.createElement("tr");
-        for (const value of Object.values(row)) {
-            const dataCell = document.createElement("td");
-            dataCell.textContent = value;
-            bodyRow.appendChild(dataCell);
-        }
-        table.appendChild(bodyRow);
-    }
-
-    return table;
-}
-
 
 // chart.js comes from a script tag in the html, so Chart is global.
 // hang onto every chart we draw so we can kill them all before a redraw.
@@ -53,6 +20,15 @@ const STATUS_COLORS = {
     REJECTED:  "#e87ba4",
 };
 
+const LANE_COLORS = {
+    SWE:      "#2a78d6",
+    "SE/FDE": "#eda100",
+    AI:       "#008300",
+    DE:       "#4a3aa7",
+    DS:       "#e34948",
+    DA:       "#eb6834",
+}
+
 // draw a pie from any query rows. say which column is the label and which is the
 // number; pass a {label: color} map to pin colors or leave it out to walk the
 // palette. title shows above the pie so two charts don't blur together.
@@ -61,7 +37,7 @@ function renderPieChart(rows, labelField, valueField, colorMap, title) {
     if (!rows || !rows.length) return document.createTextNode("No data");
 
     // chart.js paints onto a canvas. wrap it in a fixed-height box so the
-    // responsive chart doesn't grow forever inside the panel.
+    // responsive chart doesn't grow forever inside the panel
     const holder = document.createElement("div");
     holder.style.height = "155px";   // leaves room for the panel's horizontal scrollbar
     holder.style.width = "280px";    // each chart keeps its width so they scroll, not squash
@@ -103,7 +79,89 @@ function renderPieChart(rows, labelField, valueField, colorMap, title) {
     return holder;
 }
 
+// sankey graph
+function renderSankey(rows, title) {
+
+    const holder = document.createElement("div");
+    holder.style.height = "250px"; 
+    holder.style.width = "500px";    
+    holder.style.flexShrink = "0";   
+
+    const canvas = document.createElement("canvas");
+    holder.appendChild(canvas);
+
+    const sankey_row_list = [];
+    for (let i=0; i<rows.length; i++) {
+        const row = rows[i];
+
+        sankey_row_list.push({
+            "from": row["lane"],
+            "to": row["outcome"],
+            "flow": row["applications"]
+        })
+    }
+    
+    const data = {
+        datasets: [
+          {
+            label: 'Basic sankey',
+            colorFrom: (context) => LANE_COLORS[context.dataset.data[context.dataIndex].from],
+            colorTo: (context) => STATUS_COLORS[context.dataset.data[context.dataIndex].to] ?? "#898781",
+            colorMode: 'gradient',
+            data: sankey_row_list,
+          },
+        ],
+      }
+
+    const config = {
+        type: 'sankey',
+        data,
+    }
+
+    const chart = new Chart(canvas, config)
+    charts.push(chart)
+
+    return holder
+}
+
+// contribution graph, drawn by Heat.js
+function renderCalendar(element, rows) {
+    if (!rows || !rows.length) return;
+
+    $heat.render(element, {
+        title: { text: "Applications per day", showConfigurationButton: false, showTitleDropDownButton: false },
+        sideMenu: { enabled: false },
+        views: {
+            map:         { showMonthDayGaps: false },
+            line:        { enabled: false },
+            chart:       { enabled: false },
+            days:        { enabled: false },
+            months:      { enabled: false },
+            colorRanges: { enabled: false },
+        },
+        // heat.js defaults these to 10/15/20/25, which suit github commit counts. our busiest day is 7,
+        // so every day would fall under the lowest band and the whole map would draw blank
+        colorRanges: [
+            { minimum: 1, cssClassName: "day-color-1" },
+            { minimum: 2, cssClassName: "day-color-2" },
+            { minimum: 3, cssClassName: "day-color-3" },
+            { minimum: 5, cssClassName: "day-color-4" },
+        ],
+    });
+
+    // Heat.js counts occurrences, so a day with 3 applications needs that date three times
+    const dates = [];
+    for (const row of rows) {
+        for (let i = 0; i < row.applications; i++) {
+            dates.push(new Date(row.day + "T00:00:00"));   // no "Z" means local time, not UTC
+        }
+    }
+    $heat.addDates(element.id, dates);
+}
+
 const analyticsPanel = document.getElementById("top-panel");
+const extraPanel = document.getElementById("extra-viz-panel");
+
 
 // pull every job row from the db
 async function loadAnalytics() {
@@ -118,6 +176,7 @@ function renderAnalytics(stats) {
     charts = [];
 
     analyticsPanel.innerHTML = "";   // clear
+    extraPanel.innerHTML = "";       // clear
 
     // left side: the text summary, stacked together in its own box
     const summary = document.createElement("div");
@@ -132,20 +191,24 @@ function renderAnalytics(stats) {
         summary.appendChild(statusRow);
     }
 
-    const avgMatch = document.createElement("div");
-    avgMatch.textContent = `Avg match: ${stats.avgMatch}`;
-    summary.appendChild(avgMatch);
-
     analyticsPanel.appendChild(summary);
+
+    // sankey graph
+    extraPanel.appendChild(renderSankey(stats.laneOutcomes))
+
+    // heat.js renders into the element, so it has to be in the dom before we hand it over
+    const calendar = document.createElement("div");
+    calendar.id = "calendar";
+    extraPanel.appendChild(calendar);
+    renderCalendar(calendar, stats.contributionGraph);
 
     // pie charts
     analyticsPanel.appendChild(renderPieChart(stats.appsPerStatus, "job_status", "applications", STATUS_COLORS, "Applications per Job Status"));
     analyticsPanel.appendChild(renderPieChart(stats.appsPerLane, "lane", "applications", null, "Applications per Job Lane"));
     analyticsPanel.appendChild(renderPieChart(stats.pendingAppsPerLane, "lane", "applications", null, "Pending applications per Job Lane"));
     analyticsPanel.appendChild(renderPieChart(stats.avgSalaryPerLane, "lane", "avg_salaries", null, "Avg salary per Job Lane"));
-    analyticsPanel.appendChild(renderPieChart(stats.companiesMultipleApps, "company", "num_companies", null, "Companies with 2+ apps"));
-
 }
 
 loadAnalytics();
+
 

@@ -5,7 +5,6 @@ const path = require('path');
 
 // --- Database connection ---
 // A Pool manages a set of reusable connections to Postgres.
-// These values match the Postgres container from earlier.
 // host is "db", the name of the database service we'll define in docker-compose next.
 const pool = new Pool({
     host: 'localhost',   // not 'db' — Node is on your machine, not in a container
@@ -43,11 +42,16 @@ app.post('/appwebaddress', async (req, res) => {
     const lane = data.lane;
     const match_percentage = data.match_percentage;
     const notes = data.notes;
+    const salary = data.salary;
+    const min_salary = data.min_salary;
+    const max_salary = data.max_salary;
+    const offer_date = data.offer_date;
+    const rejected_date = data.rejected_date;
 
     // column list is kept in the same order as the params array so values land in the right columns
     const result = await pool.query(
-      'INSERT INTO jobapps (company, job_url, applied_date, interviewed_date, reached_out_date, job_status, interest, match_percentage, notes, role, req_num, lane) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
-      [company, job_url, applied_date, interviewed_date, reached_out_date, job_status, interest, match_percentage, notes, role, req_num, lane]
+      'INSERT INTO jobapps (company, job_url, applied_date, interviewed_date, reached_out_date, job_status, interest, match_percentage, notes, role, req_num, lane, salary, min_salary, max_salary, offer_date, rejected_date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING *',
+      [company, job_url, applied_date, interviewed_date, reached_out_date, job_status, interest, match_percentage, notes, role, req_num, lane, salary, min_salary, max_salary, offer_date, rejected_date]
     );
   
     res.status(201).json(result.rows[0]);
@@ -78,12 +82,16 @@ app.put('/appwebaddress', async (req, res) => {
     const lane = data.lane;
     const match_percentage = data.match_percentage;
     const notes = data.notes;
+    const salary = data.salary;
+    const min_salary = data.min_salary;
+    const max_salary = data.max_salary;
+    const offer_date = data.offer_date;
+    const rejected_date = data.rejected_date;
 
     const result = await pool.query(
-        'UPDATE jobapps SET company=$1, job_url=$2, applied_date=$3, interviewed_date=$4, reached_out_date=$5, job_status=$6, interest=$7, match_percentage=$8, notes=$9, role=$10, req_num=$11, lane=$12 WHERE id=$13 RETURNING *',
-        [company, job_url, applied_date, interviewed_date, reached_out_date, job_status, interest, match_percentage, notes, role, req_num, lane, id]
+        'UPDATE jobapps SET company=$1, job_url=$2, applied_date=$3, interviewed_date=$4, reached_out_date=$5, job_status=$6, interest=$7, match_percentage=$8, notes=$9, role=$10, req_num=$11, lane=$12, salary=$13, min_salary=$14, max_salary=$15, offer_date=$16, rejected_date=$17 WHERE id=$18 RETURNING *',
+        [company, job_url, applied_date, interviewed_date, reached_out_date, job_status, interest, match_percentage, notes, role, req_num, lane, salary, min_salary, max_salary, offer_date, rejected_date, id]
     );
-    console.log(`UPDATE ok: id=${id}`, result.rows[0]);
     res.status(201).json(result.rows[0]);    //send completed response to browser
   });
 
@@ -116,7 +124,6 @@ app.delete('/appwebaddress', async (req, res) => {
       return res.status(404).json({ error: 'no job found with that id' });
     }
 
-    console.log('Successfully deleted:', result.rows[0]);
     res.json(result.rows); // send back confirmation
 });
 
@@ -163,12 +170,25 @@ app.get('/analytics', async (req, res) => {
     GROUP BY lane
   `);
 
-  // companies with 2+ apps
-  const companiesMultipleApps = await pool.query(`
-    SELECT company, COUNT(*) AS num_companies
+  // application contribution graph by date (like git contribution graph)
+  // want to return rows grouped by application date, with number of applications on that date
+  const contributionGraph = await pool.query(`
+    SELECT to_char(applied_date, 'YYYY-MM-DD') AS day, COUNT(*)::int AS applications
     FROM jobapps
-    GROUP BY company
-    HAVING COUNT(*) > 1
+    GROUP BY applied_date
+    ORDER BY applied_date
+    `)
+
+  // lane -> outcome, FOR SANKEY
+  // PENDING gets split by age: anything silent 30+ days is a ghost, not live pipeline.
+  // cast as int because node-postgres returns COUNT(*) as a str and the sankey needs a number
+  const laneOutcomes = await pool.query(`
+    SELECT lane,
+           CASE WHEN job_status = 'PENDING' AND CURRENT_DATE - applied_date > 30
+                THEN 'GHOSTED' ELSE job_status END AS outcome,
+           COUNT(*)::int AS applications
+    FROM jobapps
+    GROUP BY 1, 2
   `);
 
   // send rows to the browser
@@ -179,7 +199,8 @@ app.get('/analytics', async (req, res) => {
     appsPerLane:            appsPerLane.rows, 
     pendingAppsPerLane:     pendingAppsPerLane.rows,
     avgSalaryPerLane:       avgSalaryPerLane.rows,
-    companiesMultipleApps:  companiesMultipleApps.rows
+    contributionGraph:      contributionGraph.rows,
+    laneOutcomes:           laneOutcomes.rows
   }); 
 
 });
