@@ -5,6 +5,46 @@ PUT: modify row in data table
 DELETE: remove row from data table
 *******************************/
 
+class State {
+    constructor() {
+        this.mode = null;
+        this.currentJob = null;
+        this.jobs = {};
+        this.sortBy = localStorage.getItem("sortBy") || "company";
+    }
+
+    // data: dict of parameters to update
+    update(mode, data) {
+        if (mode === "edit") {
+            // change the current job's values to updates ones
+            state.id                          = data.id;
+            state.currentJob.company          = data.company;
+            state.currentJob.role             = data.role;
+            state.currentJob.req_num          = data.req_num;
+            state.currentJob.job_url          = data.job_url;
+            state.currentJob.applied_date     = data.applied_date;
+            state.currentJob.interviewed_date = data.interviewed_date;
+            state.currentJob.offer_date       = data.offer_date;
+            state.currentJob.rejected_date    = data.rejected_date;
+            state.currentJob.reached_out_date = data.reached_out_date;
+            state.currentJob.job_status       = data.job_status;
+            state.currentJob.interest         = data.interest;
+            state.currentJob.lane             = data.lane;
+            state.currentJob.match_percentage = data.match_percentage;
+            state.currentJob.salary           = data.salary;
+            state.currentJob.min_salary       = data.min_salary;
+            state.currentJob.max_salary       = data.max_salary;
+            state.currentJob.notes            = data.notes;
+        }
+        else if (mode === "add") {
+            let new_job = data;
+            state.jobs[data.id] = new_job;
+        }
+    }
+}
+
+const state = new State()
+
 // re-fetch and rebuild the state every time data is passed to or from the DB
 // i made the SQL table the authority
 async function refreshStateData() {
@@ -95,6 +135,7 @@ const editButton = document.getElementById("edit_button");
 const submitButton = document.getElementById("submit_button");
 const cancelButton = document.getElementById("cancel_button");
 const addButton = document.getElementById("add_button");
+const sortSelect = document.getElementById("sort_select")
 
 // right panel when showing job details -- VIEW mode
 const detailEmpty = document.getElementById("detail-empty");
@@ -469,45 +510,6 @@ function showForm(mode) {
     renderStatusTrail(true);
 }
 
-class State {
-    constructor() {
-        this.mode = null;
-        this.currentJob = null;
-        this.jobs = {};
-    }
-
-    // data: dict of parameters to update
-    update(mode, data) {
-        if (mode === "edit") {
-            // change the current job's values to updates ones
-            state.id                          = data.id;
-            state.currentJob.company          = data.company;
-            state.currentJob.role             = data.role;
-            state.currentJob.req_num          = data.req_num;
-            state.currentJob.job_url          = data.job_url;
-            state.currentJob.applied_date     = data.applied_date;
-            state.currentJob.interviewed_date = data.interviewed_date;
-            state.currentJob.offer_date       = data.offer_date;
-            state.currentJob.rejected_date    = data.rejected_date;
-            state.currentJob.reached_out_date = data.reached_out_date;
-            state.currentJob.job_status       = data.job_status;
-            state.currentJob.interest         = data.interest;
-            state.currentJob.lane             = data.lane;
-            state.currentJob.match_percentage = data.match_percentage;
-            state.currentJob.salary           = data.salary;
-            state.currentJob.min_salary       = data.min_salary;
-            state.currentJob.max_salary       = data.max_salary;
-            state.currentJob.notes            = data.notes;
-        }
-        else if (mode === "add") {
-            let new_job = data;
-            state.jobs[data.id] = new_job;
-        }
-    }
-}
-
-const state = new State()
-
 const Mode = ["view", "edit", "add"];
 function setMode(mode) {
     if (!Mode.includes(mode)) {
@@ -518,19 +520,93 @@ function setMode(mode) {
 }
 setMode("view")
 
+function sortJobs(jobs, sortBy) {
+    // sort by priority which jobs need reach out:
+    // 3 buckets: 
+    //      1: NO reach-out + fresh app -> sorted ASC (old --> new)
+    //      2: YES reached out + fresh app -> TODO? sorted ASC
+    //      3: stale -> TODO? sorted ASC
+    if (sortBy == 'priority') {
+        // collect buckets
+        const bucket1 = []
+        const bucket2 = []
+        const bucket3 = []
+        for (let i = 0; i < jobs.length; i++) {
+            const row = jobs[i]
+
+            // add to buckets AND tag buckets for later colorizing
+            if (row["days_since_applied"] > 30 || row["job_status"] == 'REJECTED') {row.bucket = 3; bucket3.push(row)}
+            else if (row["reached_out_date"] === null && row["job_status"] != 'REJECTED') {row.bucket = 1; bucket1.push(row)}
+            else if (row["reached_out_date"] != null) {row.bucket = 2; bucket2.push(row)}
+        }
+
+        // sort bucket 1
+        for (let i = 0; i < bucket1.length; i++) {
+            let oldest = i;
+            for (let j = i + 1; j < bucket1.length; j++) {
+                let valueHere = bucket1[j]["days_since_applied"];
+                let valueOldest = bucket1[oldest]["days_since_applied"];
+
+                // edge cases
+                if (valueHere === null || valueHere === undefined) {valueHere = "";}
+                if (valueOldest === null || valueOldest === undefined) {valueOldest = "";}
+                
+                if (valueHere > valueOldest) {oldest = j;}                       
+            }
+            const temp = bucket1[i];
+            bucket1[i] = bucket1[oldest];
+            bucket1[oldest] = temp;
+        }
+
+        // tag each bucket with its gradient of priority in bucket1 (e.g. highest priority = darkest color)
+        for (let i = 0; i < bucket1.length; i++) {bucket1[i].shade = 0.9 - (i / bucket1.length) * 0.7;}        
+
+        // combine sorted buckets
+        return bucket1.concat(bucket2, bucket3)
+    }
+    
+    // sort by company, applied date
+    else {
+        for (let i = 0; i < jobs.length; i++) {
+            let smallest = i;
+
+            for (let j = i + 1; j < jobs.length; j++) {
+                let valueHere = jobs[j][sortBy];  // e.g. jobs[0]["company"]
+                let valueSmallest = jobs[smallest][sortBy];
+
+                // edge cases
+                if (valueHere === null || valueHere === undefined) {valueHere = "";}
+                if (valueSmallest === null || valueSmallest === undefined) {valueSmallest = "";}
+                
+                if (valueHere < valueSmallest) {
+                    smallest = j;
+                }
+            }
+            const temp = jobs[i];
+            jobs[i] = jobs[smallest];
+            jobs[smallest] = temp;
+        }
+    }
+
+    return jobs
+}
+
 // render the job tiles LEFT HAND panel
 function renderTiles(){
     const panel = document.getElementById("tiles");
     panel.innerHTML = "";                 // clear what's there
 
-    const jobs = Object.values(state.jobs).sort((a, b) =>
-        (a.company || "").localeCompare(b.company || "")
-    );    
+    let jobs = Object.values(state.jobs);
 
+    /*---- SORT BY ----*/
+    jobs = sortJobs(jobs, state.sortBy)
+          
     for (const r of jobs) {
         // create a new tile for each row
         const tile = document.createElement("div");
         tile.className = "tile";
+        if (r.bucket) {tile.className = "tile bucket-" + r.bucket;}
+        if (r.shade) {tile.style.setProperty("--shade", r.shade);}
 
         tile.dataset.id = r.id;   // instead of closing over r.id in a per-tile listener
 
@@ -699,5 +775,13 @@ document.getElementById("tiles").addEventListener("click", (e) => {
     refreshStateData(); // update state
     render();                                             // highlight lives in renderTiles now
   });
-  
+
+// sort by listener
+sortSelect.addEventListener("change", function () {
+    state.sortBy = sortSelect.value
+    localStorage.setItem("sortBy", sortSelect.value)
+    renderTiles()
+    
+});
+
 refreshStateData();

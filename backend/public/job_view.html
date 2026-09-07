@@ -65,27 +65,50 @@
     width: 400px;
   }
 
+  /* column so the menu can be a fixed bar and only the tile list scrolls.
+     overflow hidden here, the scrolling moved down to #tiles */
   #list-panel {
     grid-area: list;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     border: 1px solid #ccc;
     border-radius: 8px;
   }
 
   #tile_menu {
-    display: flex; 
-    justify-content: right;   /* horizontal centering */
-    align-items: center;       /* vertical centering */
+    flex-shrink: 0;            /* stays put, never squashed by the list below */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-bottom: 1px solid #ccc;
+    background: #fafafa;
+  }
+
+  #tiles {
+    flex: 1;              /* takes whatever height is left under the menu */
+    overflow-y: auto;     /* the only thing that scrolls */
   }
   
   .tile {
     padding: 12px;
     border-bottom: 1px solid #eee;
+    border-left: 25px solid transparent;   /* every tile reserves the stripe so text never shifts */
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: space-between;
   }
+
+  /* priority buckets. only show up when sorting by priority.
+     rgba's 4th number is opacity, 0 is invisible and 1 is solid.
+     bucket 1 reads --shade off the tile, which job_view.js sets per row so the
+     most neglected application is darkest. 0.55 is the fallback if it isn't set. */
+  .tile.bucket-1 { border-left-color: rgba(235, 104, 52, var(--shade, 0.55)); }  /* no reach-out yet */
+  .tile.bucket-2 { border-left-color: rgba(42, 120, 214, 0.55); }                /* reached out, waiting */
+  .tile.bucket-3 { border-left-color: rgba(196, 196, 196, 0.55); }               /* stale, 30+ days */
   .tile .trash {
     cursor: pointer;
     margin-left: 8px;
@@ -178,8 +201,15 @@
 
     <!-- **** TILE (bottom left) PANEL ***** -->
     <div id="list-panel">
-      <div id="tile_menu"><button id="add_button">+</button></div>  
-      <div id="tiles"></div>   
+      <div id="tile_menu">
+        <select id="sort_select">
+          <option value="company">Company</option>
+          <option value="applied_date">Date applied</option>
+          <option value="priority">Priority</option>
+        </select>
+        <button id="add_button">+</button>
+      </div>
+      <div id="tiles"></div>
       <!-- tiles get added here by JS -->
     </div>
 
@@ -190,6 +220,7 @@
     <div id="detail-panel">
       <p id="detail-empty">Select a job to see details.</p>
       <div id="detail-content" style="display:none;">
+        <p><strong>Company:</strong></p>
         <h2 id="detail-company"></h2>
         <textarea id="company_textarea" style="display:none;"></textarea>
 

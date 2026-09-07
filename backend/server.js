@@ -98,9 +98,14 @@ app.put('/appwebaddress', async (req, res) => {
 ///////// GET /////////
 // List all tickets, newest first.
 app.get('/appwebaddress', async (req, res) => {
-    const result = await pool.query('SELECT * FROM jobapps ORDER BY id DESC');
-    res.json(result.rows);
-  });
+  const result = await pool.query(`
+    SELECT *,
+           CURRENT_DATE - applied_date      AS days_since_applied,
+           CURRENT_DATE - reached_out_date  AS days_since_reachout
+    FROM jobapps ORDER BY id DESC
+  `);
+  res.json(result.rows);
+});
 
 ///////// DELETE /////////
 app.delete('/appwebaddress', async (req, res) => {
