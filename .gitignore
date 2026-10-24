@@ -220,3 +220,6 @@ node_modules
 backup.sql
 # Local database backups (contains personal job application data)
 backups/
+
+# macOS
+.DS_Store

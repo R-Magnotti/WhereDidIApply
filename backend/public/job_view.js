@@ -35,6 +35,7 @@ class State {
             state.currentJob.min_salary       = data.min_salary;
             state.currentJob.max_salary       = data.max_salary;
             state.currentJob.notes            = data.notes;
+            state.currentJob.resume_ver       = data.resume_ver;
         }
         else if (mode === "add") {
             let new_job = data;
@@ -72,6 +73,7 @@ async function update_row() {
         interest:         editInterest.value || null,
         lane:             editLane.value || null,
         match_percentage: editMatch.value || null,
+        resume_ver:       editResumeVer.value || null,
         salary:           editSalary.value || null,
         min_salary,
         max_salary,
@@ -113,6 +115,7 @@ async function submit() {
       interest:         editInterest.value || null,
       lane:             editLane.value || null,
       match_percentage: editMatch.value || null,
+      resume_ver:       editResumeVer.value || null,
       salary:           editSalary.value || null,
       min_salary,
       max_salary,
@@ -151,6 +154,7 @@ const detailApplied = document.getElementById("detail-applied");
 const detailInterviewed = document.getElementById("detail-interviewed");
 const detailReachedOut = document.getElementById("detail-reached-out");
 const detailMatch = document.getElementById("detail-match");
+const detailResumeVer = document.getElementById("detail-resume-ver");
 const detailBand = document.getElementById("detail-band");
 const detailSalary = document.getElementById("detail-salary");
 const detailUrl = document.getElementById("detail-url");
@@ -167,12 +171,22 @@ const editApplied = document.getElementById("applied_date_select");
 const editInterviewed = document.getElementById("interviewed_date_select");
 const editReachedOut = document.getElementById("reached_out_date_select");
 const editMatch = document.getElementById("match_textarea");
+const editResumeVer = document.getElementById("resume_ver_input");
 const editBand = document.getElementById("band_slider");
 const editSalary = document.getElementById("salary_input");
 const editUrl = document.getElementById("url_textarea");
 const editNotes = document.getElementById("notes_textarea");
 const editOffer = document.getElementById("offer_date_select");
 const editRejected = document.getElementById("rejected_date_select");
+
+// interview rounds -- these read and write /interviews, not the job form
+const interviewList = document.getElementById("interview-list");
+const interviewAdd = document.getElementById("interview-add");
+const roundDate = document.getElementById("round_date_input");
+const roundType = document.getElementById("round_type_input");
+const roundOutcome = document.getElementById("round_outcome_select");
+const roundNotes = document.getElementById("round_notes_textarea");
+const addRoundButton = document.getElementById("add_round_button");
 
 // status trail
 const statusGhosts = document.getElementById("status_ghosts");
@@ -322,6 +336,7 @@ function scrubDom(){
     editRejected.value     = "";
     editReachedOut.value   = "";
     editMatch.value        = "";
+    editResumeVer.value    = "";
     editSalary.value       = "";
     editUrl.value          = "";
     editNotes.value        = "";
@@ -345,6 +360,7 @@ function showForm(mode) {
             detailInterviewed.textContent  = state.currentJob.interviewed_date;
             detailReachedOut.textContent   = state.currentJob.reached_out_date;
             detailMatch.textContent        = state.currentJob.match_percentage;
+            detailResumeVer.textContent    = state.currentJob.resume_ver;
             detailBand.textContent         = state.currentJob.min_salary
                 ? money(state.currentJob.min_salary) + " – " + money(state.currentJob.max_salary)
                 : "";
@@ -363,6 +379,7 @@ function showForm(mode) {
         /* SHOW ALL POPULATED BOXES WITH DATA PERTAINING TO THE SELECTED JOB TILE */
         editButton.style.display = "";
         submitButton.style.display = "none";
+        cancelButton.style.display = "none";   // nothing to back out of in view mode
 
         // COMPANY
         detailCompany.style.display = "";
@@ -404,6 +421,10 @@ function showForm(mode) {
         detailMatch.style.display = "";
         editMatch.style.display = "none";
 
+        // RESUME VERSION
+        detailResumeVer.style.display = "";
+        editResumeVer.style.display = "none";
+
         // SALARY BAND
         detailBand.style.display = "";
         editBand.style.display = "none";
@@ -426,7 +447,6 @@ function showForm(mode) {
 
     // if displaying elements for an edit, pre-populate each field with current vals
     if (mode === "edit") {
-        cancelButton.style.display = "";
         editCompany.value = state.currentJob.company;
         editRole.value = state.currentJob.role ?? "";
         editReqNum.value = state.currentJob.req_num ?? "";
@@ -439,6 +459,7 @@ function showForm(mode) {
         editRejected.value = state.currentJob.rejected_date?.slice(0, 10) ?? "";
         editReachedOut.value = state.currentJob.reached_out_date?.slice(0, 10);
         editMatch.value = state.currentJob.match_percentage;
+        editResumeVer.value = state.currentJob.resume_ver ?? "";
         editSalary.value = state.currentJob.salary ?? "";
         editBand.noUiSlider.set([Number(state.currentJob.min_salary) || 0, Number(state.currentJob.max_salary) || 0]);
         markRequested();
@@ -450,6 +471,7 @@ function showForm(mode) {
 
     editButton.style.display = "none";
     submitButton.style.display = "";
+    cancelButton.style.display = "";   // edit and add both need a way back out
 
     // COMPANY
     detailCompany.style.display = "none";
@@ -491,6 +513,10 @@ function showForm(mode) {
     detailMatch.style.display = "none";
     editMatch.style.display = "";
 
+    // RESUME VERSION
+    detailResumeVer.style.display = "none";
+    editResumeVer.style.display = "";
+
     // SALARY BAND
     detailBand.style.display = "none";
     editBand.style.display = "";
@@ -522,10 +548,10 @@ setMode("view")
 
 function sortJobs(jobs, sortBy) {
     // sort by priority which jobs need reach out:
-    // 3 buckets: 
-    //      1: NO reach-out + fresh app -> sorted ASC (old --> new)
-    //      2: YES reached out + fresh app -> TODO? sorted ASC
-    //      3: stale -> TODO? sorted ASC
+    // 3 buckets:
+    //      1 [REACH OUT]: NO reach-out + fresh app + high interest -> sorted ASC (old --> new)
+    //      2 [ALREADY REACHED OUT]: YES reached out, not rejected -> TODO? sorted ASC
+    //      3 [DO NOT REACH OUT]: rejected / stale / low interest -> TODO? sorted ASC
     if (sortBy == 'priority') {
         // collect buckets
         const bucket1 = []
@@ -534,10 +560,16 @@ function sortJobs(jobs, sortBy) {
         for (let i = 0; i < jobs.length; i++) {
             const row = jobs[i]
 
-            // add to buckets AND tag buckets for later colorizing
-            if (row["days_since_applied"] > 30 || row["job_status"] == 'REJECTED') {row.bucket = 3; bucket3.push(row)}
-            else if (row["reached_out_date"] === null && row["job_status"] != 'REJECTED') {row.bucket = 1; bucket1.push(row)}
+            // BUCKET 3 - DO NOT REACH OUT, rejected
+            if (row["job_status"] == 'REJECTED') {row.bucket = 3; bucket3.push(row)}
+            // BUCKET 2 - ALREADY REACHED OUT
             else if (row["reached_out_date"] != null) {row.bucket = 2; bucket2.push(row)}
+            // BUCKET 3 - DO NOT REACH OUT, gone quiet too long
+            else if (row["days_since_applied"] > 30) {row.bucket = 3; bucket3.push(row)}
+            // BUCKET 3 - DO NOT REACH OUT, not worth the chase
+            else if (row["interest"] != "Priority") {row.bucket = 3; bucket3.push(row)}
+            // BUCKET 1 - REACH OUT
+            else {row.bucket = 1; bucket1.push(row)}
         }
 
         // sort bucket 1
@@ -614,9 +646,10 @@ function renderTiles(){
         company.className = "company";
         company.textContent = r.company;
 
+        // what goes under the company name in the tile
         const status = document.createElement("div");
         status.className = "status";
-        status.textContent = r.job_status;
+        status.textContent = [r.job_status, " " + r.lane];
 
         // left side: company + status stacked together
         const info = document.createElement("div");
@@ -643,6 +676,117 @@ function renderTiles(){
         panel.appendChild(tile);
     }
   }
+
+// one editable field on a round. changing it saves that round on its own, so there's
+// no submit button to remember. every field of a row shares the same round object, so
+// edits pile up on it instead of each save clobbering the last one.
+function roundField(round, key, el) {
+    const value = round[key] ?? "";
+    el.value = (key === "round_date") ? String(value).slice(0, 10) : value;
+
+    el.addEventListener("change", async function () {
+        round[key] = el.value || null;
+        await fetch('/interviews', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({body: round}),
+        });
+    });
+
+    return el;
+}
+
+// the edit-mode version of one round: every column as a live input, plus an x to drop it
+function roundInputs(round) {
+    const date = document.createElement("input");
+    date.type = "date";
+
+    const type = document.createElement("input");
+    type.type = "text";
+    type.placeholder = "phone screen, technical...";
+
+    const outcome = document.createElement("select");
+    for (const choice of ["", "PASSED", "REJECTED", "WAITING"]) {
+        const option = document.createElement("option");
+        option.value = choice;
+        option.textContent = choice || "—";
+        outcome.appendChild(option);
+    }
+
+    const notes = document.createElement("textarea");
+    notes.placeholder = "notes for this round";
+
+    // same x as the status trail, and the same confirm the tile trash uses
+    const remove = document.createElement("span");
+    remove.className = "trail-x";
+    remove.title = "delete this round";
+    remove.textContent = "×";
+    remove.addEventListener("click", async function () {
+        if (!confirm("Delete this round?")) return;
+        await fetch('/interviews', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({body: {id: round.id}}),
+        });
+        renderInterviews();
+    });
+
+    return [
+        roundField(round, "round_date", date),
+        roundField(round, "round_type", type),
+        roundField(round, "outcome", outcome),
+        roundField(round, "notes", notes),
+        remove,
+    ];
+}
+
+// interview rounds for the selected job. these live in their own table, so they're
+// fetched on their own rather than riding along in state.jobs. "add" mode has no job
+// id to hang a round off yet, so the whole block sits out until the job exists.
+async function renderInterviews() {
+    const job = state.currentJob;
+    const showRounds = !!job && state.mode !== "add";
+
+    // the list is read-only so it shows whenever a job is selected, but the add form
+    // follows the same rule as every other field: nothing is editable until Edit.
+    interviewAdd.style.display = (!!job && state.mode === "edit") ? "" : "none";
+    if (!showRounds) {
+        interviewList.replaceChildren();
+        return;
+    }
+
+    const jobId = job.id;
+    const rounds = await (await fetch('/interviews?job_id=' + jobId)).json();
+
+    // a click leaves two of these running at once, because refreshStateData renders
+    // again when its own fetch lands. the list is untouched until the rounds are in
+    // hand and then swapped in one go -- clearing before the await let both copies
+    // append into the same list and every round showed up twice.
+    const list = document.createDocumentFragment();
+    for (const round of rounds) {
+        const line = document.createElement("div");
+        line.className = "round";
+
+        if (state.mode === "edit") {
+            line.append(...roundInputs(round));
+        }
+        else {
+            // skip the blanks so a round with only a date doesn't render as "8/3/2026 | | |"
+            line.textContent = [
+                round.round_date ? fmtDate(round.round_date.slice(0, 10)) : null,
+                round.round_type,
+                round.outcome,
+                round.notes,
+            ].filter(Boolean).join(" | ");
+        }
+
+        list.appendChild(line);
+    }
+
+    // clicking another tile mid-fetch would otherwise paint this job's rounds onto that one
+    if (state.currentJob?.id !== jobId) return;
+    interviewList.replaceChildren(list);
+}
 
 // to render (RIGHT SIDE) the detail-view of current job
 function renderDetail() {
@@ -673,7 +817,9 @@ function renderDetail() {
         scrubDom()
         showForm(state.mode);
     }
-} 
+
+    renderInterviews();   // rounds come from their own table, so they paint separately
+}
 
 function render() {
     renderDetail();
@@ -775,6 +921,31 @@ document.getElementById("tiles").addEventListener("click", (e) => {
     refreshStateData(); // update state
     render();                                             // highlight lives in renderTiles now
   });
+
+// add interview round listener. posts straight to /interviews and repaints just that
+// list -- the job row itself didn't change, so there's nothing to refresh in state.
+addRoundButton.addEventListener("click", async function () {
+    if (!state.currentJob) return;
+
+    const data = {
+        job_id:     state.currentJob.id,
+        round_date: roundDate.value || null,
+        round_type: roundType.value || null,
+        outcome:    roundOutcome.value || null,
+        notes:      roundNotes.value || null,
+    };
+    await fetch('/interviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({body: data}),
+    });
+
+    roundDate.value = "";
+    roundType.value = "";
+    roundOutcome.value = "";
+    roundNotes.value = "";
+    renderInterviews();
+});
 
 // sort by listener
 sortSelect.addEventListener("change", function () {

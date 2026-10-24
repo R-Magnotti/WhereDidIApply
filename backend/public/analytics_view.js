@@ -20,6 +20,24 @@ const STATUS_COLORS = {
     REJECTED:  "#e87ba4",
 };
 
+// nodes in the interview funnel. these names come back capitalised from the query,
+// so they don't collide with the SHOUTY job_status keys in STATUS_COLORS above.
+const FUNNEL_COLORS = {
+    Applications:  "#1baf7a",
+    "1st round":   "#eb6834",
+    "2nd round":   "#eda100",
+    "3rd round":   "#4a3aa7",
+    "4th round":   "#2a78d6",
+    "5th round":   "#008300",
+    "6th round":   "#e34948",
+    Waiting:       "#eb6834",
+    Ghosted:       "#e87ba4",
+    Rejected:      "#4a3aa7",
+    "In progress": "#1baf7a",
+    Offer:         "#eda100",
+    Saved:         "#2a78d6",
+};
+
 const LANE_COLORS = {
     SWE:      "#2a78d6",
     "SE/FDE": "#eda100",
@@ -79,13 +97,80 @@ function renderPieChart(rows, labelField, valueField, colorMap, title) {
     return holder;
 }
 
-// sankey graph
-function renderSankey(rows, title) {
+// whatever a node is called, find its color. the lane sankey draws lanes on the left
+// and statuses on the right, the funnel draws its own names, so one lookup serves both.
+function nodeColor(name) {
+    return LANE_COLORS[name] ?? STATUS_COLORS[name] ?? FUNNEL_COLORS[name] ?? "#898781";
+}
+
+// the funnel rows each say "this many applications got N rounds deep, then ended here".
+// that becomes two kinds of link: one step for every round the job cleared, and one
+// final link into wherever it stopped. a job that did 3 rounds and is still going draws
+// 1st -> 2nd -> 3rd, then 3rd round -> In progress.
+//
+// rows with no rounds are skipped on purpose. they are the overwhelming majority, and
+// including them made every interview branch about 5px wide -- a sankey splits the height
+// by flow, so 1 application against 116 is 1/116th of the chart no matter how it is sized.
+// scoped to the handful that interviewed, the same branch draws ~90px. the dropped-out
+// count is stated as text above the chart instead, by renderFunnelStat.
+function buildFunnel(rows) {
+    if (!rows) return [];   // server not restarted yet, don't take the other charts down with us
+
+    const label = (depth) => {
+        if (depth === 0) return "Applications";
+        if (depth === 1) return "1st round";
+        if (depth === 2) return "2nd round";
+        if (depth === 3) return "3rd round";
+        return depth + "th round";
+    };
+
+    const cleared = {};   // depth -> how many applications got past that round
+    const links = [];
+
+    for (const row of rows) {
+        if (row.rounds < 1) continue;   // never interviewed, not part of this chart
+        for (let depth = 1; depth < row.rounds; depth++) {
+            cleared[depth] = (cleared[depth] ?? 0) + row.applications;
+        }
+        links.push({ from: label(row.rounds), to: row.outcome, flow: row.applications });
+    }
+
+    for (const depth of Object.keys(cleared)) {
+        links.push({ from: label(Number(depth)), to: label(Number(depth) + 1), flow: cleared[depth] });
+    }
+
+    return links;
+}
+
+// one line of context above the funnel, because the chart itself now only covers the
+// applications that got an interview.
+function renderFunnelStat(rows) {
+    const line = document.createElement("div");
+    line.style.fontSize = "13px";
+    line.style.color = "#666";
+    line.style.margin = "6px 0 0";
+    if (!rows || !rows.length) return line;
+
+    let total = 0;
+    let interviewed = 0;
+    for (const row of rows) {
+        total += row.applications;
+        if (row.rounds >= 1) interviewed += row.applications;
+    }
+    const pct = total ? (interviewed / total * 100).toFixed(1) : "0";
+    line.textContent = interviewed + " of " + total + " applications reached an interview (" + pct + "%)";
+
+    return line;
+}
+
+// sankey graph. takes either query rows (lane/outcome/applications) or links that
+// already say from/to/flow, which is what buildFunnel hands back.
+function renderSankey(rows, opts = {}) {
 
     const holder = document.createElement("div");
-    holder.style.height = "250px"; 
-    holder.style.width = "500px";    
-    holder.style.flexShrink = "0";   
+    holder.style.height = opts.height ?? "250px";
+    holder.style.width = opts.width ?? "500px";
+    holder.style.flexShrink = "0";
 
     const canvas = document.createElement("canvas");
     holder.appendChild(canvas);
@@ -95,18 +180,42 @@ function renderSankey(rows, title) {
         const row = rows[i];
 
         sankey_row_list.push({
-            "from": row["lane"],
-            "to": row["outcome"],
-            "flow": row["applications"]
+            "from": row["from"] ?? row["lane"],
+            "to": row["to"] ?? row["outcome"],
+            "flow": row["flow"] ?? row["applications"]
         })
     }
-    
+
+    // ONLY worth it on a two column chart. there, the library's default layout picks the
+    // biggest node, walks its links to place the rest, skips past whole nodes on the way,
+    // and never reclaims the skipped space, so the column ends up full of holes. a priority
+    // map switches to a layout that stacks each column top to bottom instead.
+    // it is WRONG on anything deeper. that layout starts each column at an offset taken from
+    // the previous column's first node, counting only its flows that skip past the next
+    // column. in the funnel that is Applications sending 112 straight to the end, so the
+    // round nodes get flung to the bottom and then back to the top. hence opts.priority.
+    let priority;
+    if (opts.priority !== false) {
+        const flowByNode = {};
+        for (const row of sankey_row_list) {
+            flowByNode[row.from] = (flowByNode[row.from] ?? 0) + row.flow;
+            flowByNode[row.to]   = (flowByNode[row.to]   ?? 0) + row.flow;
+        }
+        priority = {};
+        Object.keys(flowByNode)
+            .sort((a, b) => flowByNode[b] - flowByNode[a])
+            .forEach((key, i) => { priority[key] = i; });
+    }
+
     const data = {
         datasets: [
           {
             label: 'Basic sankey',
-            colorFrom: (context) => LANE_COLORS[context.dataset.data[context.dataIndex].from],
-            colorTo: (context) => STATUS_COLORS[context.dataset.data[context.dataIndex].to] ?? "#898781",
+            nodePadding: opts.nodePadding ?? 10,
+            modeX: opts.modeX ?? "edge",
+            priority,
+            colorFrom: (context) => nodeColor(context.dataset.data[context.dataIndex].from),
+            colorTo: (context) => nodeColor(context.dataset.data[context.dataIndex].to),
             colorMode: 'gradient',
             data: sankey_row_list,
           },
@@ -194,7 +303,23 @@ function renderAnalytics(stats) {
     analyticsPanel.appendChild(summary);
 
     // sankey graph
+    // interview funnel. every application starts in one node and either advances a round
+    // or drops out. tall with a big nodePadding on purpose: the interview branches carry
+    // 1-4 applications against 116 total, so the ribbons are a few px no matter what. the
+    // padding can't thicken them, it just keeps them from being swallowed by the fat ones.
+    // lane -> outcome. this is the chart that tells the drop-off story, and it reads fine
+    // because its smallest node still carries a couple of applications.
     extraPanel.appendChild(renderSankey(stats.laneOutcomes))
+
+    // interview progression, scoped to applications that got at least one round. the count
+    // it leaves out is stated in the line above it.
+    // modeX "left" rather than the library's "edge" default: "edge" parks every terminal in
+    // the last column, and once a terminal is hauled past the round chain it picks up more
+    // padding than the chain does, so the two ribbons swap order and cut through each other.
+    // "left" leaves nodes where their links put them, so leave order is arrive order.
+    extraPanel.appendChild(renderFunnelStat(stats.interviewFunnel))
+    extraPanel.appendChild(renderSankey(buildFunnel(stats.interviewFunnel),
+        { width: "540px", height: "320px", nodePadding: 16, priority: false, modeX: "left" }))
 
     // heat.js renders into the element, so it has to be in the dom before we hand it over
     const calendar = document.createElement("div");

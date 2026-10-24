@@ -33,7 +33,8 @@ CREATE TABLE IF NOT EXISTS jobapps (
     job_url          TEXT,
     match_percentage FLOAT CHECK (match_percentage BETWEEN 0 AND 100),
     reached_out_date DATE,
-    notes            TEXT
+    notes            TEXT,
+    resume_ver       FLOAT CHECK (resume_ver BETWEEN 0 AND 100)
 );
 ```
 

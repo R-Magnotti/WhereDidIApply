@@ -21,7 +21,8 @@
     grid-area: extra-viz;
     display: flex;
     flex-direction: column;      /* children stack top to bottom */
-    justify-content: flex-end;   /* stack to the bottom */
+    justify-content: flex-start; /* top down. flex-end puts overflow ABOVE the scroll
+                                    origin, so a tall chart gets clipped unreachably */
     align-items: center;         /* horizontal centering */
     overflow: auto;
     border: 1px solid #ccc;
@@ -177,6 +178,30 @@
     text-decoration: underline;
   }
 
+  /* one line per interview round, borrowing the trail chip's look */
+  .round {
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 5px 9px;
+    font-size: 13px;
+    margin-bottom: 4px;
+    display: flex;        /* in edit mode this row is inputs, not text */
+    flex-wrap: wrap;      /* let them stack rather than run off the panel */
+    gap: 4px;
+    align-items: center;
+  }
+  /* the panel is only 500px, so the inputs have to be told to stay small */
+  .round input, .round select, .round textarea {
+    font-size: 12px;
+  }
+  .round input[type="text"] {
+    width: 120px;
+  }
+  .round textarea {
+    width: 130px;
+    height: 22px;
+  }
+
   #date_dialog {
     border: 1px solid #999;
     border-radius: 8px;
@@ -275,11 +300,30 @@
         <p><strong>Interviewed:</strong> <span id="detail-interviewed"></span></p>
         <input id="interviewed_date_select" type="date" style="display:none;">
 
+        <!-- rounds live in their own table, so this block talks to /interviews, not the job form -->
+        <p><strong>Interview rounds:</strong></p>
+        <div id="interview-list"></div>
+        <div id="interview-add" style="display:none;">
+          <input id="round_date_input" type="date">
+          <input id="round_type_input" type="text" placeholder="phone screen, technical, onsite...">
+          <select id="round_outcome_select">
+            <option value="">—</option>
+            <option>PASSED</option>
+            <option>REJECTED</option>
+            <option>WAITING</option>
+          </select>
+          <textarea id="round_notes_textarea" placeholder="notes for this round"></textarea>
+          <button id="add_round_button" type="button">Add round</button>
+        </div>
+
         <p><strong>Reached out:</strong> <span id="detail-reached-out"></span></p>
         <input id="reached_out_date_select" type="date" style="display:none;">
 
         <p><strong>Match %:</strong> <span id="detail-match"></span></p>
         <textarea id="match_textarea" style="display:none;"></textarea>
+
+        <p><strong>Resume ver:</strong> <span id="detail-resume-ver"></span></p>
+        <input id="resume_ver_input" type="number" step="1" min="0" max="100" style="display:none;">
 
         <p><strong>Salary band:</strong> <span id="detail-band"></span></p>
         <!-- margins leave room for the handle tooltips above and the requested-salary pip below -->
