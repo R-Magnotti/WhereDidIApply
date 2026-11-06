@@ -146,7 +146,7 @@ app.get('/interviews', async (req, res) => {
 });
 
 ///////// POST /interviews /////////
-// add one round to a job. jobapps is untouched, the round lands in its own table.
+// add one round to a job
 app.post('/interviews', async (req, res) => {
     const { body } = req.body;
 
@@ -158,6 +158,13 @@ app.post('/interviews', async (req, res) => {
     const result = await pool.query(
         'INSERT INTO interviews (job_id, round_date, round_type, outcome, notes) VALUES ($1, $2, $3, $4, $5) RETURNING *',
         [data.job_id, data.round_date, data.round_type, data.outcome, data.notes]
+    );
+
+    // a round means i'm interviewing, so move the job along. only from the stages before
+    // interviewing, so an offer doesn't get demoted and a rejection doesn't come back.
+    await pool.query(
+        "UPDATE jobapps SET job_status = 'INTERVIEW' WHERE id=$1 AND job_status IN ('SAVED', 'PENDING')",
+        [data.job_id]
     );
 
     res.status(201).json(result.rows[0]);

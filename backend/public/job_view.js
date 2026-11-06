@@ -922,8 +922,9 @@ document.getElementById("tiles").addEventListener("click", (e) => {
     render();                                             // highlight lives in renderTiles now
   });
 
-// add interview round listener. posts straight to /interviews and repaints just that
-// list -- the job row itself didn't change, so there's nothing to refresh in state.
+// add interview round listener. the round moves the job to INTERVIEW, so the whole
+// page has to catch up: re-pull the jobs, re-point at the one on screen, redraw, and
+// let the charts recount.
 addRoundButton.addEventListener("click", async function () {
     if (!state.currentJob) return;
 
@@ -944,7 +945,12 @@ addRoundButton.addEventListener("click", async function () {
     roundType.value = "";
     roundOutcome.value = "";
     roundNotes.value = "";
-    renderInterviews();
+
+    const jobId = state.currentJob.id;
+    await refreshStateData();
+    state.currentJob = state.jobs[jobId];   // refresh replaced every row, so re-point at ours
+    render();
+    loadAnalytics();
 });
 
 // sort by listener

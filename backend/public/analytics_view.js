@@ -18,6 +18,7 @@ const STATUS_COLORS = {
     INTERVIEW: "#1baf7a",
     OFFER:     "#eda100",
     REJECTED:  "#e87ba4",
+    GHOSTED:   "#898781",
 };
 
 // nodes in the interview funnel. these names come back capitalised from the query,
@@ -153,14 +154,38 @@ function renderFunnelStat(rows) {
 
     let total = 0;
     let interviewed = 0;
+    let rounds = 0;
     for (const row of rows) {
         total += row.applications;
         if (row.rounds >= 1) interviewed += row.applications;
+        // each row is N applications that each sat row.rounds rounds, so the rounds
+        // multiply out. second and third rounds at the same company count separately.
+        rounds += row.rounds * row.applications;
     }
     const pct = total ? (interviewed / total * 100).toFixed(1) : "0";
-    line.textContent = interviewed + " of " + total + " applications reached an interview (" + pct + "%)";
+    line.textContent = interviewed + " of " + total + " applications reached an interview (" + pct + "%)"
+                     + "   ·   " + rounds + " interviews across all companies";
 
     return line;
+}
+
+// the lane sankey rows already have GHOSTED worked out, so the status pie counts those
+// same rows with the lane dropped. raw job_status has no GHOSTED in it -- it's derived
+// from how long a job has been silent -- and counting it separately here would let the
+// pie and the sankey drift apart.
+// the pie only asks where an application stands, and interviewing is a stage rather than
+// a place it landed, so a live interview counts as still waiting. the ones that went quiet
+// or ended in a no already come back as GHOSTED and REJECTED. the sankey keeps INTERVIEW.
+function statusTotals(laneOutcomes) {
+    const byOutcome = {};
+    for (const row of laneOutcomes) {
+        const outcome = row.outcome === "INTERVIEW" ? "PENDING" : row.outcome;
+        byOutcome[outcome] = (byOutcome[outcome] ?? 0) + row.applications;
+    }
+    return Object.keys(byOutcome).map(outcome => ({
+        job_status: outcome,
+        applications: byOutcome[outcome],
+    }));
 }
 
 // sankey graph. takes either query rows (lane/outcome/applications) or links that
@@ -328,7 +353,7 @@ function renderAnalytics(stats) {
     renderCalendar(calendar, stats.contributionGraph);
 
     // pie charts
-    analyticsPanel.appendChild(renderPieChart(stats.appsPerStatus, "job_status", "applications", STATUS_COLORS, "Applications per Job Status"));
+    analyticsPanel.appendChild(renderPieChart(statusTotals(stats.laneOutcomes), "job_status", "applications", STATUS_COLORS, "Applications per Job Status"));
     analyticsPanel.appendChild(renderPieChart(stats.appsPerLane, "lane", "applications", null, "Applications per Job Lane"));
     analyticsPanel.appendChild(renderPieChart(stats.pendingAppsPerLane, "lane", "applications", null, "Pending applications per Job Lane"));
     analyticsPanel.appendChild(renderPieChart(stats.avgSalaryPerLane, "lane", "avg_salaries", null, "Avg salary per Job Lane"));
